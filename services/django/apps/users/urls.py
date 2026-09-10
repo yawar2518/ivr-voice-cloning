@@ -1,15 +1,29 @@
-from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
+from .views import (
+    CustomTokenObtainPairView,
+    CustomTokenRefreshView,
+    CustomTokenVerifyView,
+)
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # POST /api/auth/token/ — login
+    path(
+        "token/",
+        CustomTokenObtainPairView.as_view(),
+        name="token_obtain_pair"
+    ),
 
-    # Auth endpoints — /api/auth/token/ etc.
-    path("api/auth/", include("apps.users.urls")),
+    # POST /api/auth/token/refresh/ — get new access token
+    path(
+        "token/refresh/",
+        CustomTokenRefreshView.as_view(),
+        name="token_refresh"
+    ),
 
-    # Prompts endpoints — added when we build the prompts app
-    # path("api/", include("apps.prompts.urls")),
-
-    # Audit endpoints — added when we build the audit app
-    # path("api/", include("apps.audit.urls")),
+    # POST /api/auth/token/verify/ — check token is valid
+    path(
+        "token/verify/",
+        CustomTokenVerifyView.as_view(),
+        name="token_verify"
+    ),
 ]

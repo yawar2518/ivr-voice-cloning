@@ -7,8 +7,8 @@ urlpatterns = [
     # Auth endpoints — /api/auth/token/ etc.
     path("api/auth/", include("apps.users.urls")),
 
-    # Prompts endpoints — added when we build the prompts app
-    # path("api/", include("apps.prompts.urls")),
+    # Prompts + voice models endpoints
+    path("api/", include("apps.prompts.urls")),
 
     # Audit endpoints — added when we build the audit app
     # path("api/", include("apps.audit.urls")),

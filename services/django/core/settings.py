@@ -110,13 +110,15 @@ CORS_ALLOWED_ORIGINS = config(
 
 # ─── Django REST Framework ─────────────────────────────────────────────────
 REST_FRAMEWORK = {
-    # All endpoints require authentication by default
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    # Add pagination
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
 }
 
 # ─── SimpleJWT ─────────────────────────────────────────────────────────────

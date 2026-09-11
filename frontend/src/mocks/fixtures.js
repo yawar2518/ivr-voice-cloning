@@ -12,9 +12,9 @@ export const MOCK_VOICE_MODEL = {
 };
 
 export const MOCK_USERS = {
-  generator: { id: 2, username: "sara",  role: "generator" },
-  approver:  { id: 3, username: "john",  role: "approver"  },
-  admin:     { id: 1, username: "admin", role: "admin"     }
+  generator: { id: 2, username: "sara",  email: "sara@agiletechstudio.com",  role: "generator" },
+  approver:  { id: 3, username: "john",  email: "john@agiletechstudio.com",  role: "approver"  },
+  admin:     { id: 1, username: "admin", email: "admin@agiletechstudio.com", role: "admin"     }
 };
 
 // One prompt in every possible status — covers all UI states

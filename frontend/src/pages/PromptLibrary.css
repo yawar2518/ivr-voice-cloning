@@ -50,6 +50,49 @@
   color: var(--ink-600);
 }
 
+.prompt-library-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.prompt-library-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 16px;
+  border: 1px solid rgba(23, 21, 26, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink-900);
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.prompt-library-search::placeholder {
+  color: var(--ink-400);
+}
+
+.prompt-library-search:focus {
+  outline: none;
+  border-color: rgba(23, 21, 26, 0.25);
+}
+
+.prompt-library-status-select {
+  padding: 10px 16px;
+  border: 1px solid rgba(23, 21, 26, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink-900);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .prompt-library-status {
   padding: 16px 18px;
   background: rgba(255, 255, 255, 0.55);
@@ -73,6 +116,7 @@
 }
 
 .prompt-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -86,6 +130,36 @@
     0 20px 48px rgba(90, 50, 70, 0.14),
     0 0 0 1px rgba(255, 255, 255, 0.4) inset,
     0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  cursor: default;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.prompt-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 28px 60px rgba(90, 50, 70, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+/* Gradient outline, only drawn on hover. */
+.prompt-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, #f9d9a8, #e895b8, #a8467a, #c3aed4);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.prompt-card:hover::after {
+  opacity: 1;
 }
 
 .prompt-card-header {

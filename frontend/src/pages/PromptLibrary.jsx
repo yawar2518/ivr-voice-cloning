@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import './PromptLibrary.css';
 
 const MAX_PREVIEW_LENGTH = 140;
+const SEARCH_DEBOUNCE_MS = 350;
 
 const STATUS_LABELS = {
   draft: 'Draft',
@@ -15,6 +16,8 @@ const STATUS_LABELS = {
   failed: 'Failed',
   live: 'Live'
 };
+
+const STATUS_OPTIONS = Object.keys(STATUS_LABELS);
 
 function truncate(text) {
   if (text.length <= MAX_PREVIEW_LENGTH) return text;
@@ -33,14 +36,28 @@ export default function PromptLibrary() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  // Debounce the search box so we don't refetch on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   useEffect(() => {
     let cancelled = false;
 
     setIsLoading(true);
     setError(null);
 
+    const params = {};
+    if (search) params.search = search;
+    if (statusFilter) params.status = statusFilter;
+
     apiClient
-      .getPrompts()
+      .getPrompts(params)
       .then((res) => {
         if (cancelled) return;
         setPrompts(res.results);
@@ -57,7 +74,7 @@ export default function PromptLibrary() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [search, statusFilter]);
 
   return (
     <div className="prompt-library-page">
@@ -69,6 +86,28 @@ export default function PromptLibrary() {
           Browse every voice prompt that has been generated, reviewed, or published.
         </p>
 
+        <div className="prompt-library-filters">
+          <input
+            type="text"
+            className="prompt-library-search"
+            placeholder="Search prompt text…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+          <select
+            className="prompt-library-status-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {isLoading && <div className="prompt-library-status">Loading prompts…</div>}
 
         {!isLoading && error && (
@@ -78,7 +117,9 @@ export default function PromptLibrary() {
         )}
 
         {!isLoading && !error && prompts.length === 0 && (
-          <div className="prompt-library-status">No prompts yet.</div>
+          <div className="prompt-library-status">
+            {search || statusFilter ? 'No prompts match your filters.' : 'No prompts yet.'}
+          </div>
         )}
 
         {!isLoading && !error && prompts.length > 0 && (

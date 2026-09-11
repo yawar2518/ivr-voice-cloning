@@ -1,5 +1,6 @@
 // frontend/src/components/AudioPlayer.jsx
 import { useEffect, useRef, useState } from 'react';
+import ShinyButton from './ShinyButton';
 import './AudioPlayer.css';
 
 const WAVEFORM_BARS = 96;
@@ -120,11 +121,11 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
 
   return (
     <div className="audio-player">
-      <button
-        type="button"
-        className="audio-player-toggle"
+      <ShinyButton
+        variant="icon"
+        className="audio-player-toggle-shiny"
         onClick={togglePlayback}
-        aria-label={isPlaying ? 'Pause' : 'Play'}
+        ariaLabel={isPlaying ? 'Pause' : 'Play'}
       >
         {isPlaying ? (
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -136,7 +137,7 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
             <path d="M7 5v14l12-7L7 5Z" />
           </svg>
         )}
-      </button>
+      </ShinyButton>
 
       <div className="audio-player-waveform-wrap">
         {waveformError ? (

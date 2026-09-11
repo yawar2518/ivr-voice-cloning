@@ -166,30 +166,12 @@
   box-shadow: 0 0 0 3px rgba(23, 21, 26, 0.08);
 }
 
-.login-password-toggle {
+.login-password-toggle-shiny {
   position: absolute;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: transparent;
-  color: var(--ink-400);
-  cursor: pointer;
-  border-radius: 8px;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.login-password-toggle:hover {
-  color: var(--ink-900);
-  background: rgba(23, 21, 26, 0.06);
-}
-
-.login-password-toggle svg {
-  width: 17px;
-  height: 17px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  color: #fff;
 }
 
 .login-row {
@@ -246,38 +228,18 @@
   margin-top: 1px;
 }
 
-.login-submit {
+.login-submit-shiny {
+  width: 100%;
+  margin-top: 4px;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.login-submit-shiny span {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
-  padding: 12px;
-  margin-top: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #fff;
-  background: #17151a;
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
-  box-shadow: 0 8px 20px rgba(23, 21, 26, 0.25);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease, background 0.12s ease;
-}
-
-.login-submit:hover:not(:disabled) {
-  background: #2b2731;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(23, 21, 26, 0.32);
-}
-
-.login-submit:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-.login-submit:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
 }
 
 .login-spinner {

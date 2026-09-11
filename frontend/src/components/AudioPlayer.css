@@ -10,29 +10,9 @@
   border-radius: 14px;
 }
 
-.audio-player-toggle {
+.audio-player-toggle-shiny {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 50%;
-  background: #17151a;
   color: #fff;
-  cursor: pointer;
-  transition: transform 0.12s ease, background 0.12s ease;
-}
-
-.audio-player-toggle:hover {
-  background: #2b2731;
-  transform: translateY(-1px);
-}
-
-.audio-player-toggle svg {
-  width: 16px;
-  height: 16px;
 }
 
 .audio-player-waveform-wrap {

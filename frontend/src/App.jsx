@@ -1,25 +1,13 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { apiClient } from './api/client';
-import { AuthProvider } from './context/AuthContext';
+import { Navigate, BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Generate from './pages/Generate';
+import PromptLibrary from './pages/PromptLibrary';
 import ProtectedRoute from './components/ProtectedRoute';
 
-function Dashboard() {
-  const [prompts, setPrompts] = useState(null);
-
-  useEffect(() => {
-    apiClient.getPrompts().then((res) => setPrompts(res));
-  }, []);
-
-  return (
-    <div>
-      <h1>IVR Voice Cloning Dashboard</h1>
-      <p>Frontend scaffold is working.</p>
-      <pre>{prompts ? JSON.stringify(prompts, null, 2) : 'Loading...'}</pre>
-    </div>
-  );
+function RootRedirect() {
+  const { isAuthenticated } = useAuth();
+  return <Navigate to={isAuthenticated ? '/generate' : '/login'} replace />;
 }
 
 function App() {
@@ -28,15 +16,23 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/generate-test" element={<Generate />} />
           <Route
-            path="/"
+            path="/generate"
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <Generate />
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/prompts"
+            element={
+              <ProtectedRoute>
+                <PromptLibrary />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/" element={<RootRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

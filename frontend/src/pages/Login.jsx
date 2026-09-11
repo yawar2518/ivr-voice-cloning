@@ -21,7 +21,7 @@ export default function Login() {
 
     try {
       await login(username, password);
-      navigate('/');
+      navigate('/generate', { state: { justLoggedIn: true } });
     } catch (err) {
       // Section 12: error === "authentication_failed" → detail is a string
       setError(err?.detail ?? 'Login failed. Please try again.');

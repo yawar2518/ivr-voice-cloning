@@ -1,0 +1,163 @@
+/* frontend/src/components/Navbar.css */
+
+.navbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 8px 10px 8px 14px;
+  background: linear-gradient(180deg, rgba(50, 47, 56, 0.45) 0%, rgba(23, 21, 26, 0.4) 100%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  box-shadow:
+    0 16px 40px rgba(23, 21, 26, 0.22),
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 -8px 16px rgba(255, 255, 255, 0.06) inset;
+}
+
+.navbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 45%);
+  pointer-events: none;
+}
+
+/* Post-login entrance — slides down as the splash logo shrinks away. */
+.navbar-intro {
+  opacity: 0;
+  animation: navbar-slide-down 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 1000ms;
+}
+
+@keyframes navbar-slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-56px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.navbar-logo-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.navbar-logo-mark svg {
+  width: 15px;
+  height: 15px;
+}
+
+.navbar-wordmark {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.navbar-link {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.navbar-link:hover {
+  color: #fff;
+}
+
+.navbar-link-active {
+  color: #17151a;
+  background: #fff;
+}
+
+.navbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.navbar-user-pill {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.navbar-user-role {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: capitalize;
+}
+
+.navbar-logout {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #17151a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.navbar-logout:hover {
+  background: rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 720px) {
+  .navbar {
+    flex-wrap: wrap;
+    border-radius: 24px;
+    padding: 10px 14px;
+  }
+
+  .navbar-links {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}

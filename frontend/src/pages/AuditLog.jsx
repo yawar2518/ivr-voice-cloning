@@ -1,0 +1,167 @@
+// frontend/src/pages/AuditLog.jsx
+import { useEffect, useState } from 'react';
+import { apiClient } from '../api/client';
+import Navbar from '../components/Navbar';
+import '../components/ShinyButton.css';
+import './AuditLog.css';
+
+const PAGE_SIZE = 15;
+
+const ACTION_LABELS = {
+  approved: 'Approved',
+  rejected: 'Rejected',
+  exported: 'Exported'
+};
+
+const ACTION_OPTIONS = Object.keys(ACTION_LABELS);
+
+function truncate(text, maxLength = 80) {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}…`;
+}
+
+function formatDate(isoString) {
+  return new Date(isoString).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+}
+
+export default function AuditLog() {
+  const [entries, setEntries] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [actionFilter, setActionFilter] = useState('');
+  const [page, setPage] = useState(1);
+
+  const [count, setCount] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
+
+  useEffect(() => {
+    setPage(1);
+  }, [actionFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setIsLoading(true);
+    setError(null);
+
+    const params = { page, page_size: PAGE_SIZE };
+    if (actionFilter) params.action = actionFilter;
+
+    apiClient
+      .getAuditLog(params)
+      .then((res) => {
+        if (cancelled) return;
+        setEntries(res.results);
+        setCount(res.count);
+        setHasNext(Boolean(res.next));
+        setHasPrevious(Boolean(res.previous));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err?.detail ?? 'Failed to load audit log.');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actionFilter, page]);
+
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+
+  return (
+    <div className="audit-log-page">
+      <Navbar />
+
+      <div className="audit-log-hero">
+        <h1 className="audit-log-title">Audit Log</h1>
+        <p className="audit-log-subtitle">
+          A record of every approve, reject, and export action taken on voice prompts.
+        </p>
+
+        <div className="audit-log-filters">
+          <div className="shiny-select-wrap">
+            <select
+              className="audit-log-action-select shiny-select"
+              value={actionFilter}
+              onChange={(e) => setActionFilter(e.target.value)}
+            >
+              <option value="">All actions</option>
+              {ACTION_OPTIONS.map((action) => (
+                <option key={action} value={action}>
+                  {ACTION_LABELS[action]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {isLoading && <div className="audit-log-status">Loading audit log…</div>}
+
+        {!isLoading && error && (
+          <div className="audit-log-status audit-log-status-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        {!isLoading && !error && entries.length === 0 && (
+          <div className="audit-log-status">
+            {actionFilter ? 'No entries match this filter.' : 'No audit entries yet.'}
+          </div>
+        )}
+
+        {!isLoading && !error && entries.length > 0 && (
+          <>
+            <div className="audit-log-list">
+              {entries.map((entry) => (
+                <div key={entry.id} className="audit-log-entry">
+                  <span className={`audit-log-action-badge audit-log-action-${entry.action}`}>
+                    {ACTION_LABELS[entry.action] ?? entry.action}
+                  </span>
+                  <div className="audit-log-entry-body">
+                    <p className="audit-log-entry-text">
+                      <strong>{entry.actor?.username}</strong> {entry.action}{' '}
+                      <span className="audit-log-entry-prompt">"{truncate(entry.prompt_text)}"</span>
+                    </p>
+                    {entry.reason && <p className="audit-log-entry-reason">Reason: {entry.reason}</p>}
+                  </div>
+                  <span className="audit-log-entry-date">{formatDate(entry.created_at)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="audit-log-pagination">
+              <button
+                type="button"
+                className="audit-log-page-btn"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={!hasPrevious}
+              >
+                Previous
+              </button>
+              <span className="audit-log-page-indicator">
+                Page {page} of {totalPages} · {count} entr{count === 1 ? 'y' : 'ies'}
+              </span>
+              <button
+                type="button"
+                className="audit-log-page-btn"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={!hasNext}
+              >
+                Next
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

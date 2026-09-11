@@ -1,8 +1,24 @@
 // frontend/src/mocks/handlers.js
-import { MOCK_PROMPTS, MOCK_USERS, MOCK_VOICE_MODEL } from './fixtures';
+import { MOCK_AUDIT_LOG, MOCK_PROMPTS, MOCK_USERS, MOCK_VOICE_MODEL } from './fixtures';
 const MOCK_DELAY_MS = 500;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Live approve/reject/export calls append here so the in-memory audit
+// log reflects actions taken during the session, not just seed data.
+const sessionAuditLog = [];
+
+function recordAuditEntry(action, prompt, actor, reason = null) {
+  sessionAuditLog.unshift({
+    id: `audit-${prompt.id}-${action}-${Date.now()}`,
+    action,
+    actor,
+    prompt_id: prompt.id,
+    prompt_text: prompt.text,
+    reason,
+    created_at: new Date().toISOString()
+  });
+}
 
 // In-memory store linking generateVoice() job_ids to their start time,
 // so getGenerationStatus() can simulate the 3-second resolve delay
@@ -95,7 +111,7 @@ export async function getPromptById(id) {
   return prompt;
 }
 
-export async function approvePrompt(id, currentUserRole) {
+export async function approvePrompt(id, currentUserRole, currentUser) {
   await delay(MOCK_DELAY_MS);
 
   const prompt = MOCK_PROMPTS.find((p) => p.id === id);
@@ -116,8 +132,9 @@ export async function approvePrompt(id, currentUserRole) {
   }
 
   prompt.status = 'approved';
-  prompt.approved_by = MOCK_USERS.approver; // TODO: use actual logged-in user
+  prompt.approved_by = currentUser;
   prompt.approved_at = new Date().toISOString();
+  recordAuditEntry('approved', prompt, currentUser);
 
   return {
     id: prompt.id,
@@ -127,7 +144,7 @@ export async function approvePrompt(id, currentUserRole) {
   };
 }
 
-export async function rejectPrompt(id, reason, currentUserRole) {
+export async function rejectPrompt(id, reason, currentUserRole, currentUser) {
   await delay(MOCK_DELAY_MS);
 
   const prompt = MOCK_PROMPTS.find((p) => p.id === id);
@@ -152,9 +169,10 @@ export async function rejectPrompt(id, reason, currentUserRole) {
   }
 
   prompt.status = 'rejected';
-  prompt.rejected_by = MOCK_USERS.approver; // TODO: use actual logged-in user
+  prompt.rejected_by = currentUser;
   prompt.rejected_at = new Date().toISOString();
   prompt.error_detail = reason;
+  recordAuditEntry('rejected', prompt, currentUser, reason);
 
   return {
     id: prompt.id,
@@ -183,7 +201,7 @@ export async function login(username, password) {
   };
 }
 
-export async function exportPrompt(id, currentUserRole) {
+export async function exportPrompt(id, currentUserRole, currentUser) {
   await delay(MOCK_DELAY_MS);
 
   const prompt = MOCK_PROMPTS.find((p) => p.id === id);
@@ -204,8 +222,9 @@ export async function exportPrompt(id, currentUserRole) {
   }
 
   prompt.status = 'live';
-  prompt.exported_by = MOCK_USERS.admin; // TODO: use actual logged-in user
+  prompt.exported_by = currentUser;
   prompt.exported_at = new Date().toISOString();
+  recordAuditEntry('exported', prompt, currentUser);
 
   return {
     id: prompt.id,
@@ -213,6 +232,28 @@ export async function exportPrompt(id, currentUserRole) {
     exported_by: prompt.exported_by,
     exported_at: prompt.exported_at,
     export_download_url: `/mock-audio/sample.wav` // stand-in for real export_8khz_pcm.wav
+  };
+}
+
+export async function getAuditLog(params = {}) {
+  await delay(MOCK_DELAY_MS);
+
+  let results = [...sessionAuditLog, ...MOCK_AUDIT_LOG];
+
+  if (params.action) {
+    results = results.filter((entry) => entry.action === params.action);
+  }
+
+  const page = params.page || 1;
+  const pageSize = params.page_size || 20;
+  const start = (page - 1) * pageSize;
+  const paginated = results.slice(start, start + pageSize);
+
+  return {
+    count: results.length,
+    next: start + pageSize < results.length ? `http://localhost:8000/api/audit/?page=${page + 1}` : null,
+    previous: page > 1 ? `http://localhost:8000/api/audit/?page=${page - 1}` : null,
+    results: paginated
   };
 }
 

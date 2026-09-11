@@ -27,6 +27,7 @@ export function AuthProvider({ children }) {
     accessToken,
     refreshToken,
     isAuthenticated,
+    userId: payload?.user_id ?? null,
     role: payload?.role ?? null,
     username: payload?.username ?? null,
     email: payload?.email ?? null,

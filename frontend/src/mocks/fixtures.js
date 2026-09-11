@@ -109,6 +109,51 @@ export const MOCK_PROMPTS = [
   }
 ];
 
+// Derived from MOCK_PROMPTS' approved_by/rejected_by/exported_by fields —
+// one audit entry per lifecycle action already baked into the seed data.
+// Section 11: GET /api/audit/ is admin-only.
+export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
+  const entries = [];
+
+  if (prompt.approved_by) {
+    entries.push({
+      id: `audit-${prompt.id}-approved`,
+      action: 'approved',
+      actor: prompt.approved_by,
+      prompt_id: prompt.id,
+      prompt_text: prompt.text,
+      reason: null,
+      created_at: prompt.approved_at
+    });
+  }
+
+  if (prompt.rejected_by) {
+    entries.push({
+      id: `audit-${prompt.id}-rejected`,
+      action: 'rejected',
+      actor: prompt.rejected_by,
+      prompt_id: prompt.id,
+      prompt_text: prompt.text,
+      reason: prompt.error_detail,
+      created_at: prompt.rejected_at
+    });
+  }
+
+  if (prompt.exported_by) {
+    entries.push({
+      id: `audit-${prompt.id}-exported`,
+      action: 'exported',
+      actor: prompt.exported_by,
+      prompt_id: prompt.id,
+      prompt_text: prompt.text,
+      reason: null,
+      created_at: prompt.exported_at
+    });
+  }
+
+  return entries;
+}).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
 export const mockGenerateJob = (overrides = {}) => ({
   job_id: "mock-job-" + Date.now(),
   prompt_id: "prompt-new-" + Date.now(),

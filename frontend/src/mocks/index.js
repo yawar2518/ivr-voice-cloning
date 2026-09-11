@@ -8,7 +8,8 @@ import {
   exportPrompt,
   getVoiceModels,
   generateVoice,
-  getGenerationStatus
+  getGenerationStatus,
+  getAuditLog
 } from './handlers';
 
 export const mockApiClient = {
@@ -20,5 +21,6 @@ export const mockApiClient = {
   exportPrompt,
   getVoiceModels,
   generateVoice,
-  getGenerationStatus
+  getGenerationStatus,
+  getAuditLog
 };

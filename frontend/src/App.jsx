@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Generate from './pages/Generate';
 import PromptLibrary from './pages/PromptLibrary';
+import AuditLog from './pages/AuditLog';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function RootRedirect() {
@@ -29,6 +30,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <PromptLibrary />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-log"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AuditLog />
               </ProtectedRoute>
             }
           />

@@ -1,8 +1,13 @@
 // frontend/src/mocks/handlers.js
-import { MOCK_PROMPTS, MOCK_USERS } from './fixtures';
+import { MOCK_PROMPTS, MOCK_USERS, MOCK_VOICE_MODEL } from './fixtures';
 const MOCK_DELAY_MS = 500;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// In-memory store linking generateVoice() job_ids to their start time,
+// so getGenerationStatus() can simulate the 3-second resolve delay
+// documented in contract Section 14.
+const activeJobs = {};
 
 function base64UrlEncode(obj) {
   const json = JSON.stringify(obj);
@@ -74,6 +79,7 @@ export async function getPrompts(params = {}) {
     results: paginated
   };
 }
+
 export async function getPromptById(id) {
   await delay(MOCK_DELAY_MS);
 
@@ -88,6 +94,7 @@ export async function getPromptById(id) {
 
   return prompt;
 }
+
 export async function approvePrompt(id, currentUserRole) {
   await delay(MOCK_DELAY_MS);
 
@@ -119,6 +126,7 @@ export async function approvePrompt(id, currentUserRole) {
     approved_at: prompt.approved_at
   };
 }
+
 export async function rejectPrompt(id, reason, currentUserRole) {
   await delay(MOCK_DELAY_MS);
 
@@ -156,6 +164,7 @@ export async function rejectPrompt(id, reason, currentUserRole) {
     error_detail: prompt.error_detail
   };
 }
+
 export async function login(username, password) {
   await delay(MOCK_DELAY_MS);
 
@@ -173,6 +182,7 @@ export async function login(username, password) {
     refresh: encodeMockJwt(user, 'refresh', 60 * 60 * 24 * 7)
   };
 }
+
 export async function exportPrompt(id, currentUserRole) {
   await delay(MOCK_DELAY_MS);
 
@@ -203,5 +213,94 @@ export async function exportPrompt(id, currentUserRole) {
     exported_by: prompt.exported_by,
     exported_at: prompt.exported_at,
     export_download_url: `/mock-audio/sample.wav` // stand-in for real export_8khz_pcm.wav
+  };
+}
+
+export async function getVoiceModels() {
+  await delay(MOCK_DELAY_MS);
+
+  return {
+    count: 1,
+    results: [MOCK_VOICE_MODEL]
+  };
+}
+
+export async function generateVoice(text, voiceModelId) {
+  await delay(MOCK_DELAY_MS);
+
+  const errors = {};
+  if (!text || text.trim() === '') {
+    errors.text = ['This field may not be blank.'];
+  } else if (text.length > 500) {
+    errors.text = ['Ensure this value has at most 500 characters.'];
+  }
+  if (!voiceModelId) {
+    errors.voice_model_id = ['This field is required.'];
+  }
+
+  if (Object.keys(errors).length > 0) {
+    throw { error: 'validation_error', detail: errors };
+  }
+
+  const jobId = `mock-job-${Date.now()}`;
+  const promptId = `mock-prompt-${Date.now()}`;
+
+  activeJobs[jobId] = {
+    promptId,
+    startTime: Date.now(),
+    text
+  };
+
+  return {
+    job_id: jobId,
+    prompt_id: promptId,
+    status: 'processing',
+    created_at: new Date().toISOString()
+  };
+}
+
+export async function getGenerationStatus(jobId) {
+  await delay(MOCK_DELAY_MS);
+
+  const job = activeJobs[jobId];
+
+  if (!job) {
+    throw { error: 'not_found', detail: 'No generation job found with this ID.' };
+  }
+
+  const elapsed = Date.now() - job.startTime;
+  const RESOLVE_AFTER_MS = 3000;
+
+  if (elapsed < RESOLVE_AFTER_MS) {
+    return {
+      job_id: jobId,
+      prompt_id: job.promptId,
+      status: 'processing',
+      audio_url: null,
+      duration_seconds: null,
+      error: null
+    };
+  }
+
+  const shouldFail = import.meta.env.VITE_MOCK_FAIL_GENERATION === 'true';
+
+  if (shouldFail) {
+    return {
+      job_id: jobId,
+      prompt_id: job.promptId,
+      status: 'failed',
+      audio_url: null,
+      duration_seconds: null,
+      error: 'Audio loudness out of acceptable range: -22.4 LUFS.'
+    };
+  }
+
+  return {
+    job_id: jobId,
+    prompt_id: job.promptId,
+    status: 'ready',
+    audio_url: '/mock-audio/sample.wav',
+    duration_seconds: 3.72,
+    error: null
   };
 }

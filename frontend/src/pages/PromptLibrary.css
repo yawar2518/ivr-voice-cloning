@@ -287,6 +287,13 @@
   background: #2b2731;
 }
 
+.prompt-card-download {
+  display: block;
+  flex: none;
+  text-align: center;
+  text-decoration: none;
+}
+
 .prompt-card-btn-danger {
   background: rgba(196, 48, 79, 0.12);
   color: var(--danger-500);

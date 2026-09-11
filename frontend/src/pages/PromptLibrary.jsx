@@ -252,6 +252,16 @@ export default function PromptLibrary() {
                       </p>
                     )}
 
+                    {prompt.export_download_url && (
+                      <a
+                        className="prompt-card-btn prompt-card-btn-primary prompt-card-download"
+                        href={prompt.export_download_url}
+                        download
+                      >
+                        Download IVR file
+                      </a>
+                    )}
+
                     {rejectingId === prompt.id ? (
                       <div className="prompt-card-reject-form">
                         <textarea

@@ -1,6 +1,7 @@
 // frontend/src/components/Navbar.jsx
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ShinyButton from './ShinyButton';
 import './Navbar.css';
 
 const NAV_LINKS = [
@@ -57,9 +58,9 @@ export default function Navbar({ animateIn = false }) {
         <span className="navbar-user-pill">
           {username} <span className="navbar-user-role">· {role}</span>
         </span>
-        <button type="button" className="navbar-logout" onClick={handleLogout}>
+        <ShinyButton className="navbar-logout-shiny" onClick={handleLogout}>
           Log out
-        </button>
+        </ShinyButton>
       </div>
     </nav>
   );

@@ -129,22 +129,9 @@
   text-transform: capitalize;
 }
 
-.navbar-logout {
+.navbar-logout-shiny {
   padding: 7px 14px;
-  border: none;
-  border-radius: 999px;
-  background: #fff;
-  color: #17151a;
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease, transform 0.12s ease;
-}
-
-.navbar-logout:hover {
-  background: rgba(255, 255, 255, 0.85);
-  transform: translateY(-1px);
 }
 
 @media (max-width: 720px) {

@@ -5,6 +5,7 @@ import { apiClient } from '../api/client';
 import { useGenerateJob } from '../hooks/useGenerateJob';
 import AudioPlayer from '../components/AudioPlayer';
 import Navbar from '../components/Navbar';
+import ShinyButton from '../components/ShinyButton';
 import './Generate.css';
 
 const MAX_TEXT_LENGTH = 500; // contract Section 15
@@ -178,10 +179,10 @@ export default function Generate() {
                 <span className="generate-chip">{text.length} / {MAX_TEXT_LENGTH}</span>
               </div>
 
-              <button type="submit" className="generate-submit" disabled={!canSubmit}>
+              <ShinyButton type="submit" className="generate-submit-shiny" disabled={!canSubmit}>
                 {isSubmitting && <span className="generate-spinner" aria-hidden="true" />}
                 {isSubmitting ? 'Generating…' : 'Generate'}
-              </button>
+              </ShinyButton>
             </div>
 
             {voiceModelsError && (

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ShinyButton from '../components/ShinyButton';
 import './Login.css';
 
 export default function Login() {
@@ -106,11 +107,11 @@ export default function Login() {
                 autoComplete="current-password"
                 required
               />
-              <button
-                type="button"
-                className="login-password-toggle"
+              <ShinyButton
+                variant="icon"
+                className="login-password-toggle-shiny"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                ariaLabel={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? (
                   <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -134,7 +135,7 @@ export default function Login() {
                     <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
                   </svg>
                 )}
-              </button>
+              </ShinyButton>
             </div>
           </div>
 
@@ -158,10 +159,10 @@ export default function Login() {
             </p>
           )}
 
-          <button type="submit" className="login-submit" disabled={isSubmitting}>
+          <ShinyButton type="submit" className="login-submit-shiny" disabled={isSubmitting}>
             {isSubmitting && <span className="login-spinner" aria-hidden="true" />}
             {isSubmitting ? 'Logging in…' : 'Log in'}
-          </button>
+          </ShinyButton>
         </form>
 
         <p className="login-footer">

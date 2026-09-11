@@ -1,7 +1,8 @@
 // frontend/src/mocks/index.js
-import { getPrompts, getPromptById, approvePrompt, rejectPrompt, exportPrompt } from './handlers';
+import { login, getPrompts, getPromptById, approvePrompt, rejectPrompt, exportPrompt } from './handlers';
 
 export const mockApiClient = {
+  login,
   getPrompts,
   getPromptById,
   approvePrompt,

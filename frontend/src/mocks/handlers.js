@@ -4,6 +4,36 @@ const MOCK_DELAY_MS = 500;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function base64UrlEncode(obj) {
+  const json = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(json);
+  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
+  const base64 = btoa(binary);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Fakes a JWT shape (header.payload.signature) matching Section 6's exact
+// payload structure, so decodeToken() in src/utils/jwt.js works identically
+// against mock and real tokens. Signature segment is not cryptographically
+// meaningful — the mock never verifies it.
+function encodeMockJwt(user, tokenType, ttlSeconds) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  const payload = {
+    token_type: tokenType,
+    exp: nowSeconds + ttlSeconds,
+    iat: nowSeconds,
+    jti: `mock-jti-${Math.random().toString(36).slice(2)}`,
+    user_id: user.id,
+    username: user.username,
+    email: user.email,
+    role: user.role
+  };
+
+  return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.mock-signature`;
+}
+
 export async function getPrompts(params = {}) {
   await delay(MOCK_DELAY_MS);
 
@@ -124,5 +154,54 @@ export async function rejectPrompt(id, reason, currentUserRole) {
     rejected_by: prompt.rejected_by,
     rejected_at: prompt.rejected_at,
     error_detail: prompt.error_detail
+  };
+}
+export async function login(username, password) {
+  await delay(MOCK_DELAY_MS);
+
+  const user = Object.values(MOCK_USERS).find((u) => u.username === username);
+
+  if (!user || !password) {
+    throw {
+      error: 'authentication_failed',
+      detail: 'No active account found with the given credentials.'
+    };
+  }
+
+  return {
+    access: encodeMockJwt(user, 'access', 60 * 60),
+    refresh: encodeMockJwt(user, 'refresh', 60 * 60 * 24 * 7)
+  };
+}
+export async function exportPrompt(id, currentUserRole) {
+  await delay(MOCK_DELAY_MS);
+
+  const prompt = MOCK_PROMPTS.find((p) => p.id === id);
+
+  if (!prompt) {
+    throw { error: 'not_found', detail: 'No voice prompt found with this ID.' };
+  }
+
+  if (currentUserRole !== 'admin') {
+    throw { error: 'permission_denied', detail: 'Only admins can export prompts.' };
+  }
+
+  if (prompt.status !== 'approved') {
+    throw {
+      error: 'invalid_transition',
+      detail: `Cannot export a prompt with status '${prompt.status}'. Prompt must be 'approved'.`
+    };
+  }
+
+  prompt.status = 'live';
+  prompt.exported_by = MOCK_USERS.admin; // TODO: use actual logged-in user
+  prompt.exported_at = new Date().toISOString();
+
+  return {
+    id: prompt.id,
+    status: prompt.status,
+    exported_by: prompt.exported_by,
+    exported_at: prompt.exported_at,
+    export_download_url: `/mock-audio/sample.wav` // stand-in for real export_8khz_pcm.wav
   };
 }

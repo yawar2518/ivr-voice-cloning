@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { apiClient } from './api/client';
 import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
+import Generate from './pages/Generate';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function Dashboard() {
@@ -27,6 +28,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/generate-test" element={<Generate />} />
           <Route
             path="/"
             element={

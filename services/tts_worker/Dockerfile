@@ -44,7 +44,7 @@ RUN pip install \
     transformers==5.2.0 \
     diffusers==0.29.0 \
     safetensors==0.5.3 \
-    huggingface_hub==0.33.0 \
+    huggingface_hub==1.3.0 \
     conformer==0.3.2 \
     inflect==7.3.1 \
     s3tokenizer \

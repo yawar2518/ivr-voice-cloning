@@ -1,11 +1,24 @@
 // frontend/src/api/client.js
 import { mockApiClient } from '../mocks/index';
+import * as realClient from './realClient';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK_API === 'true';
 
-// realApiClient will be added once Yawar's backend endpoints are live
-export const apiClient = USE_MOCK ? mockApiClient : null;
+// Per-function override on top of realClient: every endpoint Yawar
+// confirmed ready for Sync Point 2 is real. getAuditLog stays on the mock
+// for now — GET /api/audit/ was not in his ready list and would break
+// against the live backend; switch it once that endpoint is confirmed live.
+export const realApiClient = {
+  login: realClient.login,
+  getPrompts: realClient.getPrompts,
+  getPromptById: realClient.getPromptById,
+  approvePrompt: realClient.approvePrompt,
+  rejectPrompt: realClient.rejectPrompt,
+  exportPrompt: realClient.exportPrompt,
+  getVoiceModels: realClient.getVoiceModels,
+  generateVoice: realClient.generateVoice,
+  getGenerationStatus: realClient.getGenerationStatus,
+  getAuditLog: mockApiClient.getAuditLog
+};
 
-if (!USE_MOCK && apiClient === null) {
-  console.warn('VITE_USE_MOCK_API is false but no real API client is configured yet.');
-}
+export const apiClient = USE_MOCK ? mockApiClient : realApiClient;

@@ -13,8 +13,8 @@ boto3==1.34.144
 pyloudnorm==0.1.1
 soundfile==0.12.1
 
+# ─── Text preprocessing ─────────────────────────────────────────────────────
+inflect==7.3.1
+
 # ─── Environment ────────────────────────────────────────────────────────────
 python-decouple==3.8
-
-# NOTE: PyTorch, torchaudio, and f5-tts installed in Dockerfile.
-# numpy comes with f5-tts — do not pin it here to avoid conflicts.

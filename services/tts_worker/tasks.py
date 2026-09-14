@@ -651,3 +651,92 @@ def generate_tts(self, prompt_id: str, text: str, voice_model_id: str):
 
     finally:
         db.close()
+
+
+@app.task(name="tts_worker.tasks.export_prompt", bind=True, max_retries=0)
+def export_prompt(self, prompt_id: str, audio_s3_key: str):
+    """
+    Export task — converts approved audio to IVR format (8kHz WAV).
+    Runs in the worker where FFmpeg is available.
+    Updates VoicePrompt status to live when done.
+    """
+    db = SessionLocal()
+
+    def set_failed(error_message: str):
+        try:
+            prompt = db.query(VoicePrompt).filter(
+                VoicePrompt.id == uuid.UUID(prompt_id)
+            ).first()
+            if prompt:
+                prompt.status = "approved"  # revert to approved on failure
+                prompt.error_detail = error_message
+                prompt.updated_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception as e:
+            print(f"Failed to revert status: {e}")
+        finally:
+            db.close()
+
+    try:
+        print(f"[{prompt_id}] Starting export to IVR format...")
+
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_S3_REGION_NAME,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            original_path = os.path.join(tmpdir, "original.wav")
+            export_path = os.path.join(tmpdir, "export_8khz_pcm.wav")
+
+            # Download original playback quality audio
+            s3_client.download_file(S3_BUCKET, audio_s3_key, original_path)
+
+            # Convert to IVR format — 8kHz mono PCM 16-bit
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", original_path,
+                "-ar", FFMPEG_SAMPLE_RATE,
+                "-ac", "1",
+                "-c:a", FFMPEG_AUDIO_CODEC,
+                export_path
+            ], check=True, capture_output=True)
+
+            # Upload IVR format file to S3
+            export_s3_key = f"exports/v1.0/{prompt_id}/export_8khz_pcm.wav"
+            s3_client.upload_file(export_path, S3_BUCKET, export_s3_key)
+
+            # Generate pre-signed URL
+            export_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": S3_BUCKET, "Key": export_s3_key},
+                ExpiresIn=3600,
+            )
+
+        # Update prompt to live
+        prompt = db.query(VoicePrompt).filter(
+            VoicePrompt.id == uuid.UUID(prompt_id)
+        ).first()
+        if prompt:
+            prompt.status = "live"
+            prompt.updated_at = datetime.now(timezone.utc)
+            # Store export URL temporarily in audio_url field
+            # so Django can read it back
+            prompt.error_detail = export_url
+            db.commit()
+
+        print(f"[{prompt_id}] Export complete.")
+        db.close()
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"FFmpeg export failed: {e.stderr.decode() if e.stderr else str(e)}"
+        print(f"[{prompt_id}] {error_msg}")
+        set_failed(error_msg)
+
+    except Exception as e:
+        error_msg = f"Export error: {str(e)}"
+        print(f"[{prompt_id}] {error_msg}")
+        set_failed(error_msg)

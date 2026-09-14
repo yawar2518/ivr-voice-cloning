@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
+import AudioPlayer from '../components/AudioPlayer';
 import '../components/ShinyButton.css';
 import './PromptLibrary.css';
 
@@ -34,6 +35,72 @@ function formatDate(isoString) {
   });
 }
 
+// Whichever of approved_by/rejected_by/exported_by applies to the prompt's
+// current status — a prompt only ever has one of these set at a time.
+function getReviewedBy(prompt) {
+  if (prompt.approved_by) return { label: 'Approved by', user: prompt.approved_by, at: prompt.approved_at };
+  if (prompt.rejected_by) return { label: 'Rejected by', user: prompt.rejected_by, at: prompt.rejected_at };
+  if (prompt.exported_by) return { label: 'Exported by', user: prompt.exported_by, at: prompt.exported_at };
+  return null;
+}
+
+function PromptDetailModal({ prompt, onClose }) {
+  const reviewed = getReviewedBy(prompt);
+
+  return (
+    <div className="prompt-modal-overlay" onClick={onClose}>
+      <div className="prompt-modal" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="prompt-modal-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+
+        <span className={`prompt-status-badge prompt-status-${prompt.status}`}>
+          {STATUS_LABELS[prompt.status] ?? prompt.status}
+        </span>
+
+        <p className="prompt-modal-text">{prompt.text}</p>
+
+        {prompt.voice_model && (
+          <div className="prompt-modal-row">
+            <span className="prompt-modal-label">Voice model</span>
+            <span className="prompt-modal-value">
+              {prompt.voice_model.version_label} · {prompt.voice_model.provider} ({prompt.voice_model.model_variant})
+            </span>
+          </div>
+        )}
+
+        <div className="prompt-modal-row">
+          <span className="prompt-modal-label">Created by</span>
+          <span className="prompt-modal-value">
+            {prompt.created_by?.username} — {formatDate(prompt.created_at)}
+          </span>
+        </div>
+
+        {reviewed && (
+          <div className="prompt-modal-row">
+            <span className="prompt-modal-label">{reviewed.label}</span>
+            <span className="prompt-modal-value">
+              {reviewed.user.username} — {formatDate(reviewed.at)}
+            </span>
+          </div>
+        )}
+
+        {prompt.error_detail && (
+          <p className="prompt-modal-error" role="alert">
+            {prompt.error_detail}
+          </p>
+        )}
+
+        {prompt.audio_url && (
+          <div className="prompt-modal-audio">
+            <AudioPlayer audioUrl={prompt.audio_url} durationSeconds={prompt.duration_seconds} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PromptLibrary() {
   const { role, userId, username, email } = useAuth();
   const currentUser = { id: userId, username, email, role };
@@ -47,6 +114,7 @@ export default function PromptLibrary() {
   const [pendingAction, setPendingAction] = useState(null); // `${promptId}:${action}` while in flight
   const [rejectingId, setRejectingId] = useState(null); // prompt id currently showing the reject-reason form
   const [rejectReason, setRejectReason] = useState('');
+  const [selectedPrompt, setSelectedPrompt] = useState(null);
 
   const canApproveOrReject = role === 'approver' || role === 'admin';
   const canExport = role === 'admin';
@@ -239,6 +307,13 @@ export default function PromptLibrary() {
                       <span className={`prompt-status-badge prompt-status-${prompt.status}`}>
                         {STATUS_LABELS[prompt.status] ?? prompt.status}
                       </span>
+                      <button
+                        type="button"
+                        className="prompt-card-view-btn"
+                        onClick={() => setSelectedPrompt(prompt)}
+                      >
+                        View
+                      </button>
                     </div>
                     <p className="prompt-card-text">{truncate(prompt.text)}</p>
                     <div className="prompt-card-footer">
@@ -356,6 +431,10 @@ export default function PromptLibrary() {
           </>
         )}
       </div>
+
+      {selectedPrompt && (
+        <PromptDetailModal prompt={selectedPrompt} onClose={() => setSelectedPrompt(null)} />
+      )}
     </div>
   );
 }

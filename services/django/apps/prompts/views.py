@@ -229,9 +229,8 @@ class VoicePromptRejectView(APIView):
 class VoicePromptExportView(APIView):
     """
     POST /api/prompts/{id}/export/
-    Exports an approved prompt to IVR format (8kHz WAV).
-    Admin only.
-    Per contract Section 10.
+    Queues an export Celery task — converts approved audio to IVR format.
+    Admin only. Per contract Section 10.
     """
     permission_classes = [IsAdminRole]
 
@@ -253,66 +252,29 @@ class VoicePromptExportView(APIView):
                 status=status.HTTP_409_CONFLICT
             )
 
-        try:
-            # Download original audio from S3
-            s3_client = boto3.client(
-                "s3",
-                endpoint_url=config("AWS_S3_ENDPOINT_URL", default=None),
-                aws_access_key_id=config("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=config("AWS_SECRET_ACCESS_KEY"),
-                region_name=config("AWS_S3_REGION_NAME", default="us-east-1"),
-            )
-
-            with tempfile.TemporaryDirectory() as tmpdir:
-                original_path = os.path.join(tmpdir, "original.wav")
-                export_path = os.path.join(tmpdir, "export_8khz_pcm.wav")
-
-                # Download original playback quality audio
-                s3_client.download_file(
-                    config("AWS_STORAGE_BUCKET_NAME"),
-                    prompt.audio_s3_key,
-                    original_path
-                )
-
-                # Convert to IVR format — 8kHz mono PCM 16-bit
-                subprocess.run([
-                    "ffmpeg", "-y",
-                    "-i", original_path,
-                    "-ar", config("FFMPEG_SAMPLE_RATE", default="8000"),
-                    "-ac", "1",
-                    "-c:a", config("FFMPEG_AUDIO_CODEC", default="pcm_s16le"),
-                    export_path
-                ], check=True, capture_output=True)
-
-                # Upload IVR format file to S3
-                export_s3_key = f"exports/v1.0/{prompt.id}/export_8khz_pcm.wav"
-                s3_client.upload_file(
-                    export_path,
-                    config("AWS_STORAGE_BUCKET_NAME"),
-                    export_s3_key
-                )
-
-                # Generate pre-signed URL for download
-                export_url = s3_client.generate_presigned_url(
-                    "get_object",
-                    Params={
-                        "Bucket": config("AWS_STORAGE_BUCKET_NAME"),
-                        "Key": export_s3_key,
-                    },
-                    ExpiresIn=3600,
-                )
-
-        except Exception as e:
+        if not prompt.audio_s3_key:
             return Response(
-                {"error": "generation_failed", "detail": str(e)},
+                {"error": "generation_failed", "detail": "No audio file found for this prompt."},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY
             )
 
-        # Update prompt status to live
-        prompt.status = "live"
+        # Update prompt fields before queuing
         prompt.exported_by = request.user
         prompt.exported_at = timezone.now()
         prompt.save()
+
+        # Queue export task to worker where FFmpeg is available
+        from celery import Celery
+        from decouple import config as dconfig
+        celery_app = Celery(
+            "ivr_voice",
+            broker=dconfig("REDIS_URL", default="redis://redis:6379/0"),
+            backend=dconfig("REDIS_URL", default="redis://redis:6379/0")
+        )
+        celery_app.send_task(
+            "tts_worker.tasks.export_prompt",
+            args=[str(prompt.id), prompt.audio_s3_key],
+        )
 
         # Log to audit
         AuditLog.objects.create(
@@ -324,8 +286,13 @@ class VoicePromptExportView(APIView):
             after_status="live",
         )
 
-        serializer = VoicePromptExportSerializer(
-            prompt,
-            context={"export_download_url": export_url}
+        return Response(
+            {
+                "id": str(prompt.id),
+                "status": "live",
+                "exported_by": {"id": request.user.id, "username": request.user.username},
+                "exported_at": prompt.exported_at.isoformat(),
+                "export_download_url": "Export processing — check prompt status in 10 seconds"
+            },
+            status=status.HTTP_200_OK
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)

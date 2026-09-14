@@ -215,7 +215,7 @@ export default function Generate() {
               )}
               {jobTimedOut && (
                 <div className="generate-job-status generate-job-status-error" role="alert">
-                  This is taking longer than expected. Please check back later.
+                  Generation is taking longer than expected. Try refreshing or contact your administrator.
                 </div>
               )}
               {jobPollError && (

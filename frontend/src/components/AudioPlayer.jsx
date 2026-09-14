@@ -44,11 +44,13 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
   const [waveformError, setWaveformError] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(durationSeconds);
 
   useEffect(() => {
     let cancelled = false;
     setPeaks(null);
     setWaveformError(null);
+    setDuration(durationSeconds);
 
     async function loadWaveform() {
       try {
@@ -95,9 +97,9 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
 
   useEffect(() => {
     if (!canvasRef.current || !peaks) return;
-    const progress = durationSeconds ? currentTime / durationSeconds : 0;
+    const progress = duration ? currentTime / duration : 0;
     drawWaveform(canvasRef.current, peaks, progress);
-  }, [peaks, currentTime, durationSeconds]);
+  }, [peaks, currentTime, duration]);
 
   function togglePlayback() {
     const audio = audioRef.current;
@@ -112,11 +114,11 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
   function handleWaveformClick(event) {
     const audio = audioRef.current;
     const canvas = canvasRef.current;
-    if (!audio || !canvas || !durationSeconds) return;
+    if (!audio || !canvas || !duration) return;
 
     const rect = canvas.getBoundingClientRect();
     const ratio = (event.clientX - rect.left) / rect.width;
-    audio.currentTime = ratio * durationSeconds;
+    audio.currentTime = ratio * duration;
   }
 
   return (
@@ -150,7 +152,7 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
           />
         )}
         <div className="audio-player-time">
-          {formatTime(currentTime)} / {formatTime(durationSeconds)}
+          {formatTime(currentTime)} / {formatTime(duration)}
         </div>
       </div>
 
@@ -162,6 +164,7 @@ export default function AudioPlayer({ audioUrl, durationSeconds }) {
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
       />
     </div>
   );

@@ -160,7 +160,28 @@
 
 .prompt-card-header {
   display: flex;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prompt-card-view-btn {
+  padding: 4px 12px;
+  border: 1px solid rgba(23, 21, 26, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink-600);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.prompt-card-view-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
 }
 
 .prompt-status-badge {
@@ -376,4 +397,99 @@
   font-size: 13px;
   color: var(--ink-600);
   white-space: nowrap;
+}
+
+.prompt-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(23, 21, 26, 0.35);
+  box-sizing: border-box;
+}
+
+.prompt-modal {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  box-shadow:
+    0 30px 70px rgba(90, 50, 70, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+}
+
+.prompt-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(23, 21, 26, 0.06);
+  color: var(--ink-600);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.prompt-modal-close:hover {
+  background: rgba(23, 21, 26, 0.12);
+}
+
+.prompt-modal-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-900);
+}
+
+.prompt-modal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.prompt-modal-label {
+  color: var(--ink-400);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prompt-modal-value {
+  color: var(--ink-900);
+}
+
+.prompt-modal-error {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(196, 48, 79, 0.1);
+  border-radius: 10px;
+  color: var(--danger-500);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.prompt-modal-audio {
+  margin-top: 4px;
 }

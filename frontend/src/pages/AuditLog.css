@@ -149,6 +149,12 @@
   color: var(--ink-600);
 }
 
+.audit-log-entry-transition {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-600);
+}
+
 .audit-log-entry-reason {
   margin: 4px 0 0;
   font-size: 12px;

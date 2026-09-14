@@ -111,7 +111,11 @@ export const MOCK_PROMPTS = [
 
 // Derived from MOCK_PROMPTS' approved_by/rejected_by/exported_by fields —
 // one audit entry per lifecycle action already baked into the seed data.
-// Section 11: GET /api/audit/ is admin-only.
+// Section 11: GET /api/audit/ is admin-only. Field names (performed_by,
+// before_status, after_status, detail, timestamp) match the real backend
+// response exactly, confirmed against Yawar's live /api/audit/ data —
+// this previously used actor/prompt_text/reason/created_at, which do not
+// exist on the real endpoint.
 export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
   const entries = [];
 
@@ -119,11 +123,12 @@ export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
     entries.push({
       id: `audit-${prompt.id}-approved`,
       action: 'approved',
-      actor: prompt.approved_by,
+      performed_by: prompt.approved_by,
       prompt_id: prompt.id,
-      prompt_text: prompt.text,
-      reason: null,
-      created_at: prompt.approved_at
+      before_status: 'ready',
+      after_status: 'approved',
+      detail: {},
+      timestamp: prompt.approved_at
     });
   }
 
@@ -131,11 +136,12 @@ export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
     entries.push({
       id: `audit-${prompt.id}-rejected`,
       action: 'rejected',
-      actor: prompt.rejected_by,
+      performed_by: prompt.rejected_by,
       prompt_id: prompt.id,
-      prompt_text: prompt.text,
-      reason: prompt.error_detail,
-      created_at: prompt.rejected_at
+      before_status: 'ready',
+      after_status: 'rejected',
+      detail: { reason: prompt.error_detail },
+      timestamp: prompt.rejected_at
     });
   }
 
@@ -143,16 +149,17 @@ export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
     entries.push({
       id: `audit-${prompt.id}-exported`,
       action: 'exported',
-      actor: prompt.exported_by,
+      performed_by: prompt.exported_by,
       prompt_id: prompt.id,
-      prompt_text: prompt.text,
-      reason: null,
-      created_at: prompt.exported_at
+      before_status: 'approved',
+      after_status: 'live',
+      detail: {},
+      timestamp: prompt.exported_at
     });
   }
 
   return entries;
-}).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
 export const mockGenerateJob = (overrides = {}) => ({
   job_id: "mock-job-" + Date.now(),

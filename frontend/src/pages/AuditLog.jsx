@@ -16,16 +16,17 @@ const ACTION_LABELS = {
 
 const ACTION_OPTIONS = Object.keys(ACTION_LABELS);
 
-function truncate(text, maxLength = 80) {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength).trimEnd()}…`;
-}
-
 function formatDate(isoString) {
   return new Date(isoString).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short'
   });
+}
+
+// Section 11 gives us the prompt's UUID, not its text — show a short,
+// readable reference rather than the full id.
+function shortPromptRef(promptId) {
+  return promptId ? promptId.slice(0, 8) : promptId;
 }
 
 export default function AuditLog() {
@@ -121,12 +122,19 @@ export default function AuditLog() {
                   </span>
                   <div className="audit-log-entry-body">
                     <p className="audit-log-entry-text">
-                      <strong>{entry.actor?.username}</strong> {entry.action}{' '}
-                      <span className="audit-log-entry-prompt">"{truncate(entry.prompt_text)}"</span>
+                      <strong>{entry.performed_by?.username}</strong> {entry.action}{' '}
+                      <span className="audit-log-entry-prompt">Prompt: {shortPromptRef(entry.prompt_id)}</span>
                     </p>
-                    {entry.reason && <p className="audit-log-entry-reason">Reason: {entry.reason}</p>}
+                    {(entry.before_status || entry.after_status) && (
+                      <p className="audit-log-entry-transition">
+                        {entry.before_status ?? '—'} → {entry.after_status ?? '—'}
+                      </p>
+                    )}
+                    {entry.detail?.reason && (
+                      <p className="audit-log-entry-reason">Reason: {entry.detail.reason}</p>
+                    )}
                   </div>
-                  <span className="audit-log-entry-date">{formatDate(entry.created_at)}</span>
+                  <span className="audit-log-entry-date">{formatDate(entry.timestamp)}</span>
                 </div>
               ))}
             </div>

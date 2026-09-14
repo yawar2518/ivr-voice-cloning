@@ -12,12 +12,9 @@ boto3==1.34.144
 # ─── Audio processing ───────────────────────────────────────────────────────
 pyloudnorm==0.1.1
 soundfile==0.12.1
-# numpy>=2.0 required by ml-dtypes which comes with transformers
-numpy==2.0.2
 
 # ─── Environment ────────────────────────────────────────────────────────────
 python-decouple==3.8
 
-# NOTE: PyTorch, torchaudio, chatterbox-tts and all its deps
-# are installed in the Dockerfile in a specific order.
-# DO NOT add them here — pip will break the version pinning.
+# NOTE: PyTorch, torchaudio, and f5-tts installed in Dockerfile.
+# numpy comes with f5-tts — do not pin it here to avoid conflicts.

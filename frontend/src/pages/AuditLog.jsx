@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import Navbar from '../components/Navbar';
+import CustomDropdown from '../components/CustomDropdown';
 import '../components/ShinyButton.css';
 import './AuditLog.css';
 
@@ -88,20 +89,12 @@ export default function AuditLog() {
         </p>
 
         <div className="audit-log-filters">
-          <div className="shiny-select-wrap">
-            <select
-              className="audit-log-action-select shiny-select"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-            >
-              <option value="">All actions</option>
-              {ACTION_OPTIONS.map((action) => (
-                <option key={action} value={action}>
-                  {ACTION_LABELS[action]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomDropdown
+            options={ACTION_OPTIONS.map((action) => ({ value: action, label: ACTION_LABELS[action] }))}
+            value={actionFilter}
+            onChange={setActionFilter}
+            placeholder="All actions"
+          />
         </div>
 
         {isLoading && <div className="audit-log-status">Loading audit log…</div>}

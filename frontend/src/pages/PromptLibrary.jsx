@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import AudioPlayer from '../components/AudioPlayer';
+import CustomDropdown from '../components/CustomDropdown';
 import '../components/ShinyButton.css';
 import './PromptLibrary.css';
 
@@ -259,20 +260,12 @@ export default function PromptLibrary() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
-          <div className="shiny-select-wrap">
-            <select
-              className="prompt-library-status-select shiny-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All statuses</option>
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomDropdown
+            options={STATUS_OPTIONS.map((status) => ({ value: status, label: STATUS_LABELS[status] }))}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="All statuses"
+          />
         </div>
 
         {isLoading && <div className="prompt-library-status">Loading prompts…</div>}

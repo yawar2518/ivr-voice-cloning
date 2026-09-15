@@ -160,6 +160,13 @@ export async function exportPrompt(id /*, role, currentUser */) {
   });
 }
 
+export async function getAuditLog(params = {}) {
+  // Section 11: GET /api/audit/ — DRF pagination envelope
+  // { count, next, previous, results }. Accepts action/page/page_size
+  // query params, same as the mock.
+  return request(DJANGO_BASE_URL, `/api/audit/${toQueryString(params)}`);
+}
+
 export async function getVoiceModels() {
   // Section 10: GET /api/voice-models/ — { count, results }.
   return request(DJANGO_BASE_URL, '/api/voice-models/');

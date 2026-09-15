@@ -71,3 +71,7 @@
   background: #2b2731;
   transform: translateY(-1px);
 }
+
+.error-boundary-refresh-btn:active {
+  transform: scale(0.96);
+}

@@ -3,10 +3,12 @@ import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import Navbar from '../components/Navbar';
 import CustomDropdown from '../components/CustomDropdown';
+import { AuditRowSkeleton } from '../components/Skeleton';
 import '../components/ShinyButton.css';
 import './AuditLog.css';
 
 const PAGE_SIZE = 15;
+const SKELETON_COUNT = 4;
 
 const ACTION_LABELS = {
   approve: 'Approved',
@@ -98,7 +100,13 @@ export default function AuditLog() {
           />
         </div>
 
-        {isLoading && <div className="audit-log-status">Loading audit log…</div>}
+        {isLoading && (
+          <div className="audit-log-list">
+            {Array.from({ length: SKELETON_COUNT }, (_, i) => (
+              <AuditRowSkeleton key={i} />
+            ))}
+          </div>
+        )}
 
         {!isLoading && error && (
           <div className="audit-log-status audit-log-status-error" role="alert">

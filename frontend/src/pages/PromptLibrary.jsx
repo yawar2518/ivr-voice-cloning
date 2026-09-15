@@ -2,15 +2,18 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import AudioPlayer from '../components/AudioPlayer';
 import CustomDropdown from '../components/CustomDropdown';
+import { PromptCardSkeleton } from '../components/Skeleton';
 import '../components/ShinyButton.css';
 import './PromptLibrary.css';
 
 const MAX_PREVIEW_LENGTH = 140;
-const SEARCH_DEBOUNCE_MS = 350;
+const SEARCH_DEBOUNCE_MS = 300;
 const PAGE_SIZE = 12;
+const SKELETON_COUNT = 6;
 
 const STATUS_LABELS = {
   draft: 'Draft',
@@ -105,6 +108,7 @@ function PromptDetailModal({ prompt, onClose }) {
 export default function PromptLibrary() {
   const { role, userId, username, email } = useAuth();
   const currentUser = { id: userId, username, email, role };
+  const { showToast } = useToast();
 
   const [prompts, setPrompts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -195,8 +199,11 @@ export default function PromptLibrary() {
     try {
       const res = await apiClient.approvePrompt(prompt.id, role, currentUser);
       patchPrompt(prompt.id, res);
+      showToast('Prompt approved.', 'success');
     } catch (err) {
-      setActionErrors((prev) => ({ ...prev, [prompt.id]: err?.detail ?? 'Failed to approve prompt.' }));
+      const detail = err?.detail ?? 'Failed to approve prompt.';
+      setActionErrors((prev) => ({ ...prev, [prompt.id]: detail }));
+      showToast(detail, 'error');
     } finally {
       setPendingAction(null);
     }
@@ -221,9 +228,13 @@ export default function PromptLibrary() {
       patchPrompt(prompt.id, res);
       setRejectingId(null);
       setRejectReason('');
+      showToast('Prompt rejected.', 'success');
     } catch (err) {
-      const detail = typeof err?.detail === 'string' ? err.detail : err?.detail?.reason?.join(' ');
-      setActionErrors((prev) => ({ ...prev, [prompt.id]: detail ?? 'Failed to reject prompt.' }));
+      const detail =
+        (typeof err?.detail === 'string' ? err.detail : err?.detail?.reason?.join(' ')) ??
+        'Failed to reject prompt.';
+      setActionErrors((prev) => ({ ...prev, [prompt.id]: detail }));
+      showToast(detail, 'error');
     } finally {
       setPendingAction(null);
     }
@@ -235,8 +246,11 @@ export default function PromptLibrary() {
     try {
       const res = await apiClient.exportPrompt(prompt.id, role, currentUser);
       patchPrompt(prompt.id, res);
+      showToast('Prompt exported.', 'success');
     } catch (err) {
-      setActionErrors((prev) => ({ ...prev, [prompt.id]: err?.detail ?? 'Failed to export prompt.' }));
+      const detail = err?.detail ?? 'Failed to export prompt.';
+      setActionErrors((prev) => ({ ...prev, [prompt.id]: detail }));
+      showToast(detail, 'error');
     } finally {
       setPendingAction(null);
     }
@@ -268,7 +282,13 @@ export default function PromptLibrary() {
           />
         </div>
 
-        {isLoading && <div className="prompt-library-status">Loading prompts…</div>}
+        {isLoading && (
+          <div className="prompt-library-grid">
+            {Array.from({ length: SKELETON_COUNT }, (_, i) => (
+              <PromptCardSkeleton key={i} />
+            ))}
+          </div>
+        )}
 
         {!isLoading && error && (
           <div className="prompt-library-status prompt-library-status-error" role="alert">
@@ -293,6 +313,8 @@ export default function PromptLibrary() {
 
                 const showApproveReject = canApproveOrReject && prompt.status === 'ready';
                 const showExport = canExport && prompt.status === 'approved';
+                const showDelete =
+                  role === 'admin' && ['draft', 'failed', 'rejected'].includes(prompt.status);
 
                 return (
                   <div key={prompt.id} className="prompt-card">
@@ -360,7 +382,7 @@ export default function PromptLibrary() {
                         </div>
                       </div>
                     ) : (
-                      (showApproveReject || showExport) && (
+                      (showApproveReject || showExport || showDelete) && (
                         <div className="prompt-card-actions">
                           {showApproveReject && (
                             <>
@@ -390,6 +412,16 @@ export default function PromptLibrary() {
                               disabled={isBusy}
                             >
                               {isExporting ? 'Exporting…' : 'Export'}
+                            </button>
+                          )}
+                          {showDelete && (
+                            <button
+                              type="button"
+                              className="prompt-card-btn prompt-card-btn-danger"
+                              disabled
+                              title="Delete is coming soon"
+                            >
+                              Delete
                             </button>
                           )}
                         </div>

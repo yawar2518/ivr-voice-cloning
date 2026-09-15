@@ -31,6 +31,10 @@
   transform: translateY(-1px);
 }
 
+.custom-dropdown-trigger:active {
+  transform: scale(0.96);
+}
+
 .custom-dropdown-trigger:focus-visible {
   outline: none;
   border-color: rgba(23, 21, 26, 0.3);

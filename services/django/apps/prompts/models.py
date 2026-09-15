@@ -9,6 +9,12 @@ class VoiceModelVersion(models.Model):
     See API_CONTRACT.md Section 7.2
     """
 
+    class Language(models.TextChoices):
+        ENGLISH = "english", "English"
+        URDU = "urdu", "Urdu"
+        HINDI = "hindi", "Hindi"
+        BILINGUAL = "bilingual", "Bilingual"
+
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
@@ -18,6 +24,28 @@ class VoiceModelVersion(models.Model):
     provider = models.CharField(max_length=50)
     model_variant = models.CharField(max_length=20)
     reference_audio = models.CharField(max_length=500)
+    display_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Friendly name shown in the UI, e.g. 'Rachel (English)'"
+    )
+    language = models.CharField(
+        max_length=20,
+        choices=Language.choices,
+        default=Language.ENGLISH,
+    )
+    reference_text = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Transcript of the reference audio; auto-transcribed by the worker if empty"
+    )
+    audio_s3_key = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="S3 key of the uploaded reference audio (44.1kHz WAV)"
+    )
     is_active = models.BooleanField(default=True)
     notes = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

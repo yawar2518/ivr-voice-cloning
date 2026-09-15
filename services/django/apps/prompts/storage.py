@@ -25,6 +25,38 @@ def _public_client():
     )
 
 
+def _internal_client():
+    # In-network endpoint ("http://minio:9000") — used for server-side
+    # uploads, which happen inside the compose network rather than from the
+    # browser. See the module docstring for why this differs from the client
+    # used for pre-signing.
+    return boto3.client(
+        "s3",
+        endpoint_url=getattr(settings, "AWS_S3_ENDPOINT_URL", None),
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
+        config=Config(signature_version="s3v4"),
+    )
+
+
+def upload_file(local_path, s3_key, content_type=None):
+    """Upload a local file to the configured bucket, creating it if missing."""
+    client = _internal_client()
+    try:
+        client.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+    except Exception:
+        client.create_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+
+    extra_args = {"ContentType": content_type} if content_type else None
+    client.upload_file(
+        local_path,
+        settings.AWS_STORAGE_BUCKET_NAME,
+        s3_key,
+        ExtraArgs=extra_args,
+    )
+
+
 def presigned_url(s3_key, download_as=None, content_type=None, expires_in=None):
     """
     Build a browser-reachable pre-signed GET URL for `s3_key`.

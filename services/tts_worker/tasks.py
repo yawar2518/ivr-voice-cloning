@@ -77,9 +77,14 @@ BRAND_NAMES_PATH = config(
 
 # ─── Reference voice conditioning ──────────────────────────────────────────
 # F5-TTS is zero-shot: any reference clip works as-is. Passing ref_text=""
-# tells it to transcribe the clip itself (Whisper, downloaded on first run)
-# instead of relying on a hand-typed transcript that has to match the audio
-# word-for-word.
+# tells it to transcribe the clip itself, which downloads Whisper (1.5GB) on
+# first run — so a voice model with no hand-typed transcript falls back to
+# this generic IVR line instead of "", and ref_text is never empty going into
+# infer().
+DEFAULT_REF_TEXT = (
+    "Thank you for calling. Your call is important to us. "
+    "Please hold while we connect you to the next available agent."
+)
 
 # Plausible speaking rates in bytes of Latin-script text per second. Used to
 # gate generated audio for truncation/silence — unhurried IVR delivery sits
@@ -218,7 +223,7 @@ def prepare_voice_reference(voice_model_id: str) -> tuple:
     print(f"[{voice_model_id}] Reference ready: {clip_path} "
           f"(from {voice_model.audio_s3_key})")
 
-    result = (clip_path, voice_model.reference_text or "")
+    result = (clip_path, voice_model.reference_text or DEFAULT_REF_TEXT)
     _voice_reference_cache[voice_model_id] = result
     return result
 
@@ -400,7 +405,7 @@ def run_quality_gates(audio_path: str) -> float:
 # ─── Audio generation ───────────────────────────────────────────────────────
 
 def synthesize(gen_text: str, out_path: str,
-               reference_path: str, ref_text: str = "") -> float:
+               reference_path: str, ref_text: str = DEFAULT_REF_TEXT) -> float:
     """Run F5-TTS against the given reference and gate the raw result."""
     if _f5tts_model is None:
         raise RuntimeError("F5-TTS model not loaded.")
@@ -408,10 +413,11 @@ def synthesize(gen_text: str, out_path: str,
     # Buys the last word room to finish; see TTS_GEN_TEXT_TAIL above.
     spoken_text = gen_text + GEN_TEXT_TAIL
 
-    # An empty ref_text tells F5-TTS to transcribe the reference itself.
+    # An empty ref_text tells F5-TTS to transcribe the reference itself,
+    # downloading Whisper — never forward "" here, fall back instead.
     _f5tts_model.infer(
         ref_file=reference_path,
-        ref_text=ref_text,
+        ref_text=ref_text or DEFAULT_REF_TEXT,
         gen_text=spoken_text,
         file_wave=out_path,
         seed=TTS_SEED,

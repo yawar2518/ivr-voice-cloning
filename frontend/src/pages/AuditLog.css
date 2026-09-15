@@ -102,6 +102,15 @@
     0 14px 34px rgba(90, 50, 70, 0.1),
     0 0 0 1px rgba(255, 255, 255, 0.4) inset,
     0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.audit-log-entry:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 20px 44px rgba(90, 50, 70, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
 }
 
 .audit-log-action-badge {
@@ -116,6 +125,7 @@
   letter-spacing: 0.04em;
   white-space: nowrap;
   margin-top: 2px;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .audit-log-action-approve {
@@ -194,6 +204,10 @@
 .audit-log-page-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.85);
   transform: translateY(-1px);
+}
+
+.audit-log-page-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .audit-log-page-btn:disabled {

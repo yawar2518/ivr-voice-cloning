@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useGenerateJob } from '../hooks/useGenerateJob';
+import { useToast } from '../context/ToastContext';
 import AudioPlayer from '../components/AudioPlayer';
 import Navbar from '../components/Navbar';
 import ShinyButton from '../components/ShinyButton';
+import { SkeletonBlock } from '../components/Skeleton';
 import './Generate.css';
 
 const MAX_TEXT_LENGTH = 500; // contract Section 15
@@ -19,6 +21,7 @@ export default function Generate() {
   // Play the splash→navbar→card entrance only right after a fresh login
   // (Login.jsx sets this via navigate state); never on a later visit/refresh.
   const [playIntro] = useState(() => Boolean(location.state?.justLoggedIn));
+  const { showToast } = useToast();
 
   const [text, setText] = useState('');
 
@@ -86,10 +89,19 @@ export default function Generate() {
       } else {
         setSubmitErrors({ non_field: [err?.detail ?? 'Failed to generate voice prompt.'] });
       }
+      showToast('Failed to generate voice prompt.', 'error');
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    if (jobStatus === 'ready') {
+      showToast('Voice prompt generated successfully.', 'success');
+    } else if (jobStatus === 'failed') {
+      showToast(jobResult?.error ?? 'Voice generation failed.', 'error');
+    }
+  }, [jobStatus]);
 
   const activeModel = voiceModels.find((m) => m.id === selectedVoiceModelId);
 
@@ -156,26 +168,29 @@ export default function Generate() {
 
             <div className="generate-card-footer">
               <div className="generate-chip-row">
-                <label htmlFor="generate-voice-model" className="generate-chip-select-wrap">
-                  <select
-                    id="generate-voice-model"
-                    className="generate-chip-select"
-                    value={selectedVoiceModelId}
-                    onChange={(e) => setSelectedVoiceModelId(e.target.value)}
-                    disabled={isLoadingVoiceModels || voiceModels.length === 0}
-                  >
-                    {isLoadingVoiceModels && <option value="">Loading…</option>}
-                    {!isLoadingVoiceModels && voiceModels.length === 0 && !voiceModelsError && (
-                      <option value="">No voice models</option>
-                    )}
-                    {voiceModels.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {voiceModelLabel(model)}
-                        {model.is_active ? ' (active)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {isLoadingVoiceModels ? (
+                  <SkeletonBlock className="generate-chip-select-skeleton" />
+                ) : (
+                  <label htmlFor="generate-voice-model" className="generate-chip-select-wrap">
+                    <select
+                      id="generate-voice-model"
+                      className="generate-chip-select"
+                      value={selectedVoiceModelId}
+                      onChange={(e) => setSelectedVoiceModelId(e.target.value)}
+                      disabled={voiceModels.length === 0}
+                    >
+                      {voiceModels.length === 0 && !voiceModelsError && (
+                        <option value="">No voice models</option>
+                      )}
+                      {voiceModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {voiceModelLabel(model)}
+                          {model.is_active ? ' (active)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <span className="generate-chip">{text.length} / {MAX_TEXT_LENGTH}</span>
               </div>
 

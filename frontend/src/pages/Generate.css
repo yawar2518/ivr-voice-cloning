@@ -248,6 +248,12 @@
   display: inline-flex;
 }
 
+.generate-chip-select-skeleton {
+  width: 160px;
+  height: 30px;
+  border-radius: 999px;
+}
+
 .generate-chip-select {
   padding: 7px 12px;
   border-radius: 999px;

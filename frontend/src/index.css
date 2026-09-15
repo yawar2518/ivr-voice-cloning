@@ -15,3 +15,18 @@ body,
 body {
   min-height: 100vh;
 }
+
+div,
+section,
+p {
+  cursor: default;
+}
+
+input,
+textarea {
+  cursor: text;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.97);
+}

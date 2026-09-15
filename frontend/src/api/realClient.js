@@ -160,6 +160,16 @@ export async function exportPrompt(id /*, role, currentUser */) {
   });
 }
 
+export async function deletePrompt(id /*, role, currentUser */) {
+  // Backend: DELETE /api/prompts/{id}/delete/ — admin only, and only for
+  // prompts in draft/failed/rejected status; returns 204 on success.
+  // role/currentUser are accepted (unused) to keep the call signature
+  // identical to approvePrompt/rejectPrompt/exportPrompt.
+  return request(DJANGO_BASE_URL, `/api/prompts/${id}/delete/`, {
+    method: 'DELETE'
+  });
+}
+
 export async function getAuditLog(params = {}) {
   // Section 11: GET /api/audit/ — DRF pagination envelope
   // { count, next, previous, results }. Accepts action/page/page_size

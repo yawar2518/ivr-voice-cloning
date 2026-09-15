@@ -239,6 +239,33 @@ export async function exportPrompt(id, currentUserRole, currentUser) {
   };
 }
 
+export async function deletePrompt(id, currentUserRole) {
+  await delay(MOCK_DELAY_MS);
+
+  const index = MOCK_PROMPTS.findIndex((p) => p.id === id);
+
+  if (index === -1) {
+    throw { error: 'not_found', detail: 'No voice prompt found with this ID.' };
+  }
+
+  if (currentUserRole !== 'admin') {
+    throw { error: 'permission_denied', detail: 'Only admins can delete prompts.' };
+  }
+
+  const prompt = MOCK_PROMPTS[index];
+  const deletableStates = ['draft', 'failed', 'rejected'];
+  if (!deletableStates.includes(prompt.status)) {
+    throw {
+      error: 'invalid_transition',
+      detail: `Cannot delete a prompt with status '${prompt.status}'. Only draft, failed, and rejected prompts can be deleted.`
+    };
+  }
+
+  MOCK_PROMPTS.splice(index, 1);
+
+  return null;
+}
+
 export async function getAuditLog(params = {}) {
   await delay(MOCK_DELAY_MS);
 

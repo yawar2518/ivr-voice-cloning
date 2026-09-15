@@ -158,3 +158,17 @@ if USE_S3:
     AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default=None)
     AWS_DEFAULT_ACL = None
     AWS_S3_FILE_OVERWRITE = False
+
+    # Endpoint the *browser* can reach. AWS_S3_ENDPOINT_URL above is the
+    # in-network address ("http://minio:9000") — it resolves inside the compose
+    # network but not on the user's machine, so a pre-signed URL built from it
+    # is useless to the frontend. Pre-signing is an offline computation, so we
+    # sign against this public address directly rather than string-replacing the
+    # host afterwards. In production both point at the same real S3 endpoint.
+    AWS_S3_PUBLIC_ENDPOINT_URL = config(
+        "AWS_S3_PUBLIC_ENDPOINT_URL",
+        default="http://localhost:9000",
+    )
+    AWS_S3_PRESIGN_EXPIRY = config(
+        "AWS_S3_PRESIGN_EXPIRY", default=3600, cast=int
+    )

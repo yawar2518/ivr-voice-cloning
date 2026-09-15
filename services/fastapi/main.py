@@ -12,12 +12,21 @@ from sqlalchemy import create_engine, Column, String, Text, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from celery import Celery
+from fastapi.middleware.cors import CORSMiddleware
 
 # ─── App Setup ─────────────────────────────────────────────────────────────
 app = FastAPI(
     title="IVR Voice Cloning — Generation API",
     description="Async TTS generation endpoint. Part of AgileTech Studio case study.",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ─── Config ────────────────────────────────────────────────────────────────
@@ -231,25 +240,12 @@ def generate_voice(
 @app.get(
     "/api/generate/status/{job_id}/",
     response_model=StatusResponse,
-    summary="Poll generation job status",
-    description="Returns the current status of a TTS generation job. Ahtesham calls this every 2 seconds until status is no longer 'processing'."
 )
 def get_generation_status(
     job_id: str,
     payload: dict = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    """
-    GET /api/generate/status/{job_id}/
-    
-    Looks up the VoicePrompt record by celery_task_id.
-    Returns current status, audio_url if ready, error if failed.
-    
-    Auth: any authenticated role
-    See API_CONTRACT.md Section 9.
-    """
-
-    # Find the prompt by Celery task ID
     prompt = db.query(VoicePrompt).filter(
         VoicePrompt.celery_task_id == job_id
     ).first()
@@ -260,11 +256,16 @@ def get_generation_status(
             detail={"error": "not_found", "detail": "No generation job found with this ID."}
         )
 
+    # Replace internal minio hostname with localhost for browser access
+    audio_url = prompt.audio_url
+    if audio_url:
+        audio_url = audio_url.replace("http://minio:9000", "http://localhost:9000")
+
     return StatusResponse(
         job_id=job_id,
         prompt_id=str(prompt.id),
         status=prompt.status,
-        audio_url=prompt.audio_url,
+        audio_url=audio_url,
         duration_seconds=float(prompt.duration_seconds) if prompt.duration_seconds else None,
         error=prompt.error_detail,
     )

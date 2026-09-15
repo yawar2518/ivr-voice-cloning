@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import VoicePrompt, VoiceModelVersion
+from .storage import export_download_url, presigned_url
 from apps.users.models import User
 
 
@@ -31,16 +32,13 @@ class VoiceModelVersionSerializer(serializers.ModelSerializer):
 
 
 class VoicePromptSerializer(serializers.ModelSerializer):
-    """
-    Full serializer for VoicePrompt.
-    Used by GET /api/prompts/ and GET /api/prompts/{id}/
-    Per contract Section 10.
-    """
     voice_model = VoiceModelVersionSerializer(read_only=True)
     created_by = UserBriefSerializer(read_only=True)
     approved_by = UserBriefSerializer(read_only=True)
     rejected_by = UserBriefSerializer(read_only=True)
     exported_by = UserBriefSerializer(read_only=True)
+    audio_url = serializers.SerializerMethodField()
+    export_download_url = serializers.SerializerMethodField()
 
     class Meta:
         model = VoicePrompt
@@ -50,6 +48,7 @@ class VoicePromptSerializer(serializers.ModelSerializer):
             "status",
             "voice_model",
             "audio_url",
+            "export_download_url",
             "duration_seconds",
             "created_by",
             "approved_by",
@@ -62,6 +61,26 @@ class VoicePromptSerializer(serializers.ModelSerializer):
             "rejected_at",
             "exported_at",
         ]
+
+    def get_audio_url(self, obj):
+        # Re-sign on every read. The URL persisted on the row was signed by the
+        # worker and expires an hour later, so a prompt listed the next day used
+        # to hand the player a dead link.
+        if obj.audio_s3_key:
+            return presigned_url(obj.audio_s3_key, content_type="audio/wav")
+        if obj.audio_url:
+            # Rows written before audio_s3_key was populated.
+            return obj.audio_url.replace(
+                "http://minio:9000",
+                "http://localhost:9000"
+            )
+        return None
+
+    def get_export_download_url(self, obj):
+        # Only set once the export task has actually uploaded the IVR file, so
+        # the frontend renders the download button only when it resolves to a
+        # real WAV.
+        return export_download_url(obj)
 
 
 class VoicePromptApproveSerializer(serializers.ModelSerializer):
@@ -107,4 +126,4 @@ class VoicePromptExportSerializer(serializers.ModelSerializer):
         ]
 
     def get_export_download_url(self, obj):
-        return self.context.get("export_download_url")
+        return export_download_url(obj)

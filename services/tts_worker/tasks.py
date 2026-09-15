@@ -80,44 +80,14 @@ BRAND_NAMES_PATH = config(
 )
 
 # ─── Reference voice conditioning ──────────────────────────────────────────
-# F5-TTS has no duration model. It infers how long the generated speech should
-# be straight from the reference pair:
-#
-#     duration = ref_audio_frames
-#              + ref_audio_frames / len(ref_text_bytes) * len(gen_text_bytes)
-#
-# so len(ref_text) / ref_audio_duration IS the speaking rate the model is told
-# to reproduce. If ref_text describes more speech than ref_audio actually
-# contains, the model believes the speaker talks faster than they do and
-# allocates too few frames — the utterance comes out truncated or empty.
-#
-# F5-TTS also silently re-clips any reference over 12s down to ~8-12s of
-# de-silenced audio while keeping the whole ref_text, which breaks the pairing
-# on its own. So the clip handed over has to be under 12s already.
-#
-# TTS_REF_CLIP_START/END select the window of TTS_REFERENCE_AUDIO that
-# TTS_REFERENCE_TEXT transcribes, word for word. Change all three together.
-REF_CLIP_START = config("TTS_REF_CLIP_START", default="1.15", cast=float)
-REF_CLIP_END = config("TTS_REF_CLIP_END", default="8.45", cast=float)
+# F5-TTS is zero-shot: any reference clip works as-is. Passing ref_text=""
+# tells it to transcribe the clip itself (Whisper, downloaded on first run)
+# instead of relying on a hand-typed transcript that has to match the audio
+# word-for-word.
 
-# Spell the transcript the way preprocess_text spells generated text (digits
-# expanded, brand names respelled, acronyms spaced). Both sides of the ratio
-# above have to use the same orthography to be comparable.
-REFERENCE_TEXT = config(
-    "TTS_REFERENCE_TEXT",
-    default=(
-        "Thank you for calling Agile Tech Studio. "
-        "Your call is important to us. "
-        "Please hold while we connect you to the next available agent."
-    ),
-)
-
-F5_REF_CLIP_LIMIT_SECONDS = 12.0   # F5-TTS re-clips anything longer
-
-# Plausible speaking rates in bytes of Latin-script text per second. Used both
-# to validate the reference pair at startup and to gate generated audio.
-# Unhurried IVR delivery sits around 15-20; the broken pipeline was asking for
-# ~40, which is how the truncation showed up.
+# Plausible speaking rates in bytes of Latin-script text per second. Used to
+# gate generated audio for truncation/silence — unhurried IVR delivery sits
+# around 15-20.
 SPEECH_RATE_MIN = 9.0
 SPEECH_RATE_MAX = 30.0
 
@@ -164,6 +134,7 @@ class VoicePrompt(Base):
     voice_model_id = Column(UUID(as_uuid=True), nullable=True)
     audio_url = Column(Text, nullable=True)
     audio_s3_key = Column(String(500), nullable=True)
+    export_s3_key = Column(String(500), nullable=True)
     duration_seconds = Column(String(10), nullable=True)
     celery_task_id = Column(String(255), nullable=True)
     error_detail = Column(Text, nullable=True)
@@ -180,114 +151,45 @@ class VoicePrompt(Base):
 
 # ─── Globals populated once per worker process ─────────────────────────────
 _f5tts_model = None
-_reference = None
+_reference_path = None
 
 
-class ReferenceVoice:
-    """A reference clip paired with the transcript of exactly that clip."""
+def prepare_reference_audio() -> str:
+    """Convert TTS_REFERENCE_AUDIO to the 24kHz mono WAV F5-TTS expects.
 
-    def __init__(self, audio_path: str, text: str, duration: float):
-        self.audio_path = audio_path
-        self.text = text
-        self.duration = duration
-        self.bytes_per_second = len(text.encode("utf-8")) / duration
-
-    def __repr__(self):
-        return (f"<ReferenceVoice {self.duration:.2f}s "
-                f"{self.bytes_per_second:.1f}B/s>")
-
-
-def audio_duration(path: str) -> float:
-    info = sf.info(path)
-    return info.frames / info.samplerate
-
-
-def build_reference() -> ReferenceVoice:
-    """Cut the reference window, run it through F5-TTS's own preprocessor once,
-    and verify the resulting pair describes a plausible speaking rate.
-
-    Checking after preprocess_ref_audio_text matters: that function trims
-    silence and may re-clip, so the clip the model actually sees is not the one
-    ffmpeg wrote.
+    No clipping, no transcript: F5-TTS is zero-shot and handles any reference
+    length itself, transcribing it internally when ref_text is empty.
     """
-    from f5_tts.infer.utils_infer import preprocess_ref_audio_text
-
     if not os.path.exists(TTS_REFERENCE_AUDIO):
         raise RuntimeError(f"Reference audio not found: {TTS_REFERENCE_AUDIO}")
-
-    window = REF_CLIP_END - REF_CLIP_START
-    if window <= 0:
-        raise RuntimeError(
-            f"TTS_REF_CLIP_END ({REF_CLIP_END}) must be after "
-            f"TTS_REF_CLIP_START ({REF_CLIP_START})."
-        )
-    if window > F5_REF_CLIP_LIMIT_SECONDS:
-        raise RuntimeError(
-            f"Reference window is {window:.2f}s. F5-TTS re-clips anything over "
-            f"{F5_REF_CLIP_LIMIT_SECONDS:.0f}s while keeping the full "
-            f"transcript, which desynchronises the pair. Narrow "
-            f"TTS_REF_CLIP_START/END and shorten TTS_REFERENCE_TEXT to match."
-        )
 
     cache_dir = os.path.join(tempfile.gettempdir(), "tts_reference")
     os.makedirs(cache_dir, exist_ok=True)
     clip_path = os.path.join(cache_dir, "reference_clip.wav")
 
-    # 24kHz mono is F5-TTS's native rate, so it never has to resample.
     subprocess.run([
         "ffmpeg", "-y", "-v", "error",
         "-i", TTS_REFERENCE_AUDIO,
-        "-ss", str(REF_CLIP_START),
-        "-to", str(REF_CLIP_END),
         "-ar", "24000",
         "-ac", "1",
         "-c:a", "pcm_s16le",
         clip_path,
     ], check=True, capture_output=True)
 
-    effective_path, effective_text = preprocess_ref_audio_text(
-        clip_path, REFERENCE_TEXT, show_info=lambda *a, **k: None
-    )
-    duration = audio_duration(effective_path)
-    reference = ReferenceVoice(effective_path, effective_text, duration)
-
-    if duration > F5_REF_CLIP_LIMIT_SECONDS:
-        raise RuntimeError(
-            f"F5-TTS reduced the reference to {duration:.2f}s, over the "
-            f"{F5_REF_CLIP_LIMIT_SECONDS:.0f}s limit, so the transcript no "
-            f"longer matches the audio."
-        )
-
-    rate = reference.bytes_per_second
-    if not (SPEECH_RATE_MIN <= rate <= SPEECH_RATE_MAX):
-        raise RuntimeError(
-            f"Reference pair is inconsistent: "
-            f"{len(effective_text.encode('utf-8'))} bytes of transcript over "
-            f"{duration:.2f}s of audio = {rate:.1f} bytes/sec, outside the "
-            f"plausible {SPEECH_RATE_MIN:.0f}-{SPEECH_RATE_MAX:.0f} "
-            f"bytes/sec band.\n"
-            f"  Too high -> TTS_REFERENCE_TEXT covers more speech than the "
-            f"clip contains; generated audio will come out truncated.\n"
-            f"  Too low  -> the transcript is missing words; prosody drifts "
-            f"and output runs long.\n"
-            f"Re-check TTS_REF_CLIP_START/END against TTS_REFERENCE_TEXT."
-        )
-
-    print(f"Reference ready: {reference} (window "
-          f"{REF_CLIP_START:.2f}-{REF_CLIP_END:.2f}s of "
-          f"{os.path.basename(TTS_REFERENCE_AUDIO)})")
-    return reference
+    print(f"Reference ready: {clip_path} "
+          f"(from {os.path.basename(TTS_REFERENCE_AUDIO)})")
+    return clip_path
 
 
 @worker_process_init.connect
 def load_model_on_startup(**kwargs):
-    global _f5tts_model, _reference
+    global _f5tts_model, _reference_path
     print("Loading F5-TTS model...")
     try:
         from f5_tts.api import F5TTS
         _f5tts_model = F5TTS(device=TTS_DEVICE)
         print(f"F5-TTS model loaded on {TTS_DEVICE}")
-        _reference = build_reference()
+        _reference_path = prepare_reference_audio()
     except Exception as e:
         print(f"Failed to initialise F5-TTS: {e}")
         raise
@@ -415,9 +317,7 @@ def check_raw_generation(audio_path: str, gen_text: str) -> float:
         raise ValueError(
             f"Generated audio is {duration:.2f}s for {gen_bytes} bytes of "
             f"text — {rate:.1f} bytes/sec, far faster than speech. F5-TTS "
-            f"under-allocated frames and the utterance is truncated. The "
-            f"usual cause is a reference clip whose audio and "
-            f"TTS_REFERENCE_TEXT no longer describe the same speech."
+            f"under-allocated frames and the utterance is truncated."
         )
     if rate < low:
         raise ValueError(
@@ -459,22 +359,21 @@ def run_quality_gates(audio_path: str) -> float:
 # ─── Audio generation ───────────────────────────────────────────────────────
 
 def synthesize(gen_text: str, out_path: str,
-               reference: "ReferenceVoice" = None) -> float:
+               reference_path: str = None) -> float:
     """Run F5-TTS against the prepared reference and gate the raw result."""
-    reference = reference or _reference
+    reference_path = reference_path or _reference_path
     if _f5tts_model is None:
         raise RuntimeError("F5-TTS model not loaded.")
-    if reference is None:
+    if reference_path is None:
         raise RuntimeError("Reference voice not prepared.")
 
     # Buys the last word room to finish; see TTS_GEN_TEXT_TAIL above.
     spoken_text = gen_text + GEN_TEXT_TAIL
 
-    # ref_file is the already-preprocessed clip, so F5-TTS's own
-    # preprocess_ref_audio_text is a cache hit here and cannot re-clip it.
+    # ref_text="" tells F5-TTS to transcribe the reference itself.
     _f5tts_model.infer(
-        ref_file=reference.audio_path,
-        ref_text=reference.text,
+        ref_file=reference_path,
+        ref_text="",
         gen_text=spoken_text,
         file_wave=out_path,
         seed=TTS_SEED,
@@ -707,13 +606,11 @@ def export_prompt(self, prompt_id: str, audio_s3_key: str):
 
             # Upload IVR format file to S3
             export_s3_key = f"exports/v1.0/{prompt_id}/export_8khz_pcm.wav"
-            s3_client.upload_file(export_path, S3_BUCKET, export_s3_key)
-
-            # Generate pre-signed URL
-            export_url = s3_client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": S3_BUCKET, "Key": export_s3_key},
-                ExpiresIn=3600,
+            s3_client.upload_file(
+                export_path,
+                S3_BUCKET,
+                export_s3_key,
+                ExtraArgs={"ContentType": "audio/wav"},
             )
 
         # Update prompt to live
@@ -723,13 +620,17 @@ def export_prompt(self, prompt_id: str, audio_s3_key: str):
         if prompt:
             prompt.status = "live"
             prompt.updated_at = datetime.now(timezone.utc)
-            # Store export URL temporarily in audio_url field
-            # so Django can read it back
-            prompt.error_detail = export_url
+            # Record the export under its own key. It used to be written over
+            # audio_s3_key/audio_url, which destroyed the only reference to the
+            # playback-quality master and left the in-app player serving the
+            # 8 kHz telephony file. No URL is stored: a pre-signed URL expires
+            # in an hour, so Django signs one per request instead.
+            prompt.export_s3_key = export_s3_key
             db.commit()
 
         print(f"[{prompt_id}] Export complete.")
         db.close()
+        return export_s3_key
 
     except subprocess.CalledProcessError as e:
         error_msg = f"FFmpeg export failed: {e.stderr.decode() if e.stderr else str(e)}"

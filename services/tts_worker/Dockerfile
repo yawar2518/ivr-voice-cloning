@@ -39,6 +39,18 @@ RUN pip install --upgrade pip && \
 # No --no-deps tricks needed unlike Chatterbox
 RUN pip install f5-tts
 
+# f5-tts pulls in torchcodec as a dependency, but the prebuilt wheel's CUDA
+# extension is ABI-incompatible with this image's torch/CUDA build (same
+# libtorchcodec issue as the torchaudio shim in tasks.py — see there for
+# details). transformers checks torchcodec's presence via package metadata,
+# not a real import, so it unconditionally imports it inside the ASR
+# pipeline's preprocess() whenever F5-TTS auto-transcribes a reference clip
+# (ref_text=""), crashing with "Could not load this library:
+# libtorchcodec_image.so". Nothing here needs torchcodec — audio loading goes
+# through the soundfile-backed shim instead — so removing it avoids the crash
+# entirely.
+RUN pip uninstall -y torchcodec
+
 # ─── Step 3: Install project requirements ──────────────────────────────────
 COPY requirements.txt .
 RUN pip install -r requirements.txt

@@ -88,6 +88,7 @@ services:
       - ./services/tts_worker:/app
       - ./voice_assets:/app/voice_assets
       - ./config:/app/config
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       - redis
       - db
@@ -130,3 +131,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  hf_cache:

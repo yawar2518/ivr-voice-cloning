@@ -88,6 +88,16 @@ class VoicePrompt(models.Model):
         blank=True,
         help_text="Internal S3 key — never exposed in API"
     )
+    export_s3_key = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text=(
+            "Internal S3 key of the exported 8 kHz IVR WAV — never exposed in "
+            "API. Kept separate from audio_s3_key so exporting does not destroy "
+            "the reference to the playback-quality master."
+        )
+    )
     duration_seconds = models.DecimalField(
         max_digits=6,
         decimal_places=2,

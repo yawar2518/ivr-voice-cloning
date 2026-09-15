@@ -17,7 +17,12 @@ import boto3
 import subprocess
 import tempfile
 import os
+from celery.exceptions import TimeoutError as CeleryTimeoutError
 from decouple import config
+
+# How long POST /export/ blocks waiting for the worker before handing the
+# client back to polling. See VoicePromptExportView.post.
+EXPORT_WAIT_SECONDS = config("EXPORT_WAIT_SECONDS", default=20, cast=int)
 
 
 # ─── Permissions ───────────────────────────────────────────────────────────
@@ -271,10 +276,28 @@ class VoicePromptExportView(APIView):
             broker=dconfig("REDIS_URL", default="redis://redis:6379/0"),
             backend=dconfig("REDIS_URL", default="redis://redis:6379/0")
         )
-        celery_app.send_task(
+        async_result = celery_app.send_task(
             "tts_worker.tasks.export_prompt",
             args=[str(prompt.id), prompt.audio_s3_key],
         )
+
+        # Wait briefly for the conversion. Transcoding an already-generated WAV
+        # down to 8 kHz takes well under a second, so the normal case resolves
+        # here and the caller gets a usable link in the POST response. The
+        # worker runs at concurrency 1 and shares its queue with GPU
+        # generation, so the wait is bounded: if a long generation is ahead of
+        # us in the queue we fall through and let the client poll the prompt
+        # detail endpoint, which serves the same pre-signed link once ready.
+        try:
+            async_result.get(timeout=EXPORT_WAIT_SECONDS, propagate=False)
+        except CeleryTimeoutError:
+            pass
+        except Exception:
+            # A broker/result-backend problem must not fail an export that the
+            # worker may still complete — fall through to the polling path.
+            pass
+
+        prompt.refresh_from_db()
 
         # Log to audit
         AuditLog.objects.create(
@@ -283,16 +306,53 @@ class VoicePromptExportView(APIView):
             performed_by=request.user,
             ip_address=request.META.get("REMOTE_ADDR"),
             before_status="approved",
-            after_status="live",
+            after_status=prompt.status,
         )
 
-        return Response(
-            {
-                "id": str(prompt.id),
-                "status": "live",
-                "exported_by": {"id": request.user.id, "username": request.user.username},
-                "exported_at": prompt.exported_at.isoformat(),
-                "export_download_url": "Export processing — check prompt status in 10 seconds"
-            },
-            status=status.HTTP_200_OK
+        serializer = VoicePromptExportSerializer(prompt)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class VoicePromptDeleteView(APIView):
+    """
+    DELETE /api/prompts/{id}/
+    Deletes a prompt that is in draft, failed, or rejected status.
+    Admin only.
+    Per contract role permission matrix Section 6.
+    """
+    permission_classes = [IsAdminRole]
+
+    def delete(self, request, pk):
+        try:
+            prompt = VoicePrompt.objects.get(pk=pk)
+        except VoicePrompt.DoesNotExist:
+            return Response(
+                {"error": "not_found", "detail": "No voice prompt found with this ID."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Only allow deletion of safe states
+        deletable_states = ["draft", "failed", "rejected"]
+        if prompt.status not in deletable_states:
+            return Response(
+                {
+                    "error": "invalid_transition",
+                    "detail": f"Cannot delete a prompt with status '{prompt.status}'. Only draft, failed, and rejected prompts can be deleted."
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
+        # Log to audit before deleting
+        AuditLog.objects.create(
+            action="generate",
+            prompt_id=prompt.id,
+            performed_by=request.user,
+            ip_address=request.META.get("REMOTE_ADDR"),
+            before_status=prompt.status,
+            after_status="deleted",
+            detail={"text": prompt.text[:100]}
         )
+
+        prompt.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

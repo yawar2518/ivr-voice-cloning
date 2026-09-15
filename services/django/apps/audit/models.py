@@ -15,6 +15,7 @@ class AuditLog(models.Model):
         APPROVE = "approve", "Approve"
         REJECT = "reject", "Reject"
         EXPORT = "export", "Export"
+        DELETE = "delete", "Delete"
         LOGIN = "login", "Login"
         LOGOUT = "logout", "Logout"
 

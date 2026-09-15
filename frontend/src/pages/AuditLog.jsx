@@ -9,9 +9,9 @@ import './AuditLog.css';
 const PAGE_SIZE = 15;
 
 const ACTION_LABELS = {
-  approved: 'Approved',
-  rejected: 'Rejected',
-  exported: 'Exported'
+  approve: 'Approved',
+  reject: 'Rejected',
+  export: 'Exported'
 };
 
 const ACTION_OPTIONS = Object.keys(ACTION_LABELS);
@@ -122,7 +122,8 @@ export default function AuditLog() {
                   </span>
                   <div className="audit-log-entry-body">
                     <p className="audit-log-entry-text">
-                      <strong>{entry.performed_by?.username}</strong> {entry.action}{' '}
+                      <strong>{entry.performed_by?.username}</strong>{' '}
+                      {(ACTION_LABELS[entry.action] ?? entry.action).toLowerCase()}{' '}
                       <span className="audit-log-entry-prompt">Prompt: {shortPromptRef(entry.prompt_id)}</span>
                     </p>
                     {(entry.before_status || entry.after_status) && (

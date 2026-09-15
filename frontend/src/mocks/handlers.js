@@ -136,7 +136,7 @@ export async function approvePrompt(id, currentUserRole, currentUser) {
   prompt.status = 'approved';
   prompt.approved_by = currentUser;
   prompt.approved_at = new Date().toISOString();
-  recordAuditEntry('approved', prompt, beforeStatus, prompt.status, currentUser);
+  recordAuditEntry('approve', prompt, beforeStatus, prompt.status, currentUser);
 
   return {
     id: prompt.id,
@@ -175,7 +175,7 @@ export async function rejectPrompt(id, reason, currentUserRole, currentUser) {
   prompt.rejected_by = currentUser;
   prompt.rejected_at = new Date().toISOString();
   prompt.error_detail = reason;
-  recordAuditEntry('rejected', prompt, beforeStatus, prompt.status, currentUser, reason);
+  recordAuditEntry('reject', prompt, beforeStatus, prompt.status, currentUser, reason);
 
   return {
     id: prompt.id,
@@ -228,7 +228,7 @@ export async function exportPrompt(id, currentUserRole, currentUser) {
   prompt.status = 'live';
   prompt.exported_by = currentUser;
   prompt.exported_at = new Date().toISOString();
-  recordAuditEntry('exported', prompt, beforeStatus, prompt.status, currentUser);
+  recordAuditEntry('export', prompt, beforeStatus, prompt.status, currentUser);
 
   return {
     id: prompt.id,

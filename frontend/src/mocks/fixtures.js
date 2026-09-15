@@ -122,7 +122,7 @@ export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
   if (prompt.approved_by) {
     entries.push({
       id: `audit-${prompt.id}-approved`,
-      action: 'approved',
+      action: 'approve',
       performed_by: prompt.approved_by,
       prompt_id: prompt.id,
       before_status: 'ready',
@@ -135,7 +135,7 @@ export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
   if (prompt.rejected_by) {
     entries.push({
       id: `audit-${prompt.id}-rejected`,
-      action: 'rejected',
+      action: 'reject',
       performed_by: prompt.rejected_by,
       prompt_id: prompt.id,
       before_status: 'ready',
@@ -148,7 +148,7 @@ export const MOCK_AUDIT_LOG = MOCK_PROMPTS.flatMap((prompt) => {
   if (prompt.exported_by) {
     entries.push({
       id: `audit-${prompt.id}-exported`,
-      action: 'exported',
+      action: 'export',
       performed_by: prompt.exported_by,
       prompt_id: prompt.id,
       before_status: 'approved',

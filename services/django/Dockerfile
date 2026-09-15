@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
     gcc \
     # curl — useful for healthchecks and debugging inside container
     curl \
+    # ffmpeg — converts uploaded voice reference clips to 44.1kHz WAV
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # ─── Working Directory ─────────────────────────────────────────────────────

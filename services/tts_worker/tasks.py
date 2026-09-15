@@ -57,10 +57,6 @@ app = Celery("tts_worker", broker=REDIS_URL, backend=REDIS_URL)
 # ─── Config ────────────────────────────────────────────────────────────────
 DATABASE_URL = config("DATABASE_URL").replace("postgres://", "postgresql://")
 TTS_DEVICE = config("TTS_DEVICE", default="cuda")
-TTS_REFERENCE_AUDIO = config(
-    "TTS_REFERENCE_AUDIO",
-    default="/app/voice_assets/reference_voice.wav"
-)
 FFMPEG_SAMPLE_RATE = config("FFMPEG_SAMPLE_RATE", default="8000")
 FFMPEG_OUTPUT_FORMAT = config("FFMPEG_OUTPUT_FORMAT", default="wav")
 FFMPEG_AUDIO_CODEC = config("FFMPEG_AUDIO_CODEC", default="pcm_s16le")
@@ -149,47 +145,92 @@ class VoicePrompt(Base):
     exported_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class VoiceModelVersion(Base):
+    __tablename__ = "prompts_voicemodelversion"
+
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    reference_audio = Column(String(500), nullable=True)
+    reference_text = Column(Text, nullable=True)
+    audio_s3_key = Column(String(500), nullable=True)
+
+
 # ─── Globals populated once per worker process ─────────────────────────────
 _f5tts_model = None
-_reference_path = None
+
+# Per-voice-model reference clips, prepared lazily and cached for the life of
+# the worker process — each voice model owns its own S3-hosted reference clip,
+# so generation for one voice never touches another's conditioning audio. This
+# replaces the single hardcoded TTS_REFERENCE_AUDIO env var every generation
+# used to share.
+_voice_reference_cache = {}
 
 
-def prepare_reference_audio() -> str:
-    """Convert TTS_REFERENCE_AUDIO to the 24kHz mono WAV F5-TTS expects.
+def prepare_voice_reference(voice_model_id: str) -> tuple:
+    """Resolve, download, and convert a voice model's reference clip.
 
-    No clipping, no transcript: F5-TTS is zero-shot and handles any reference
-    length itself, transcribing it internally when ref_text is empty.
+    Returns (local_wav_path, reference_text). Cached per voice_model_id for
+    the life of the worker process.
     """
-    if not os.path.exists(TTS_REFERENCE_AUDIO):
-        raise RuntimeError(f"Reference audio not found: {TTS_REFERENCE_AUDIO}")
+    if voice_model_id in _voice_reference_cache:
+        return _voice_reference_cache[voice_model_id]
 
-    cache_dir = os.path.join(tempfile.gettempdir(), "tts_reference")
+    db = SessionLocal()
+    try:
+        voice_model = db.query(VoiceModelVersion).filter(
+            VoiceModelVersion.id == uuid.UUID(voice_model_id)
+        ).first()
+    finally:
+        db.close()
+
+    if not voice_model:
+        raise ValueError(f"VoiceModelVersion {voice_model_id} not found.")
+    if not voice_model.audio_s3_key:
+        raise ValueError(
+            f"VoiceModelVersion {voice_model_id} has no reference audio uploaded."
+        )
+
+    cache_dir = os.path.join(tempfile.gettempdir(), "tts_reference", voice_model_id)
     os.makedirs(cache_dir, exist_ok=True)
+    downloaded_path = os.path.join(cache_dir, "source.wav")
     clip_path = os.path.join(cache_dir, "reference_clip.wav")
 
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=AWS_S3_ENDPOINT_URL,
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        region_name=AWS_S3_REGION_NAME,
+    )
+    s3_client.download_file(S3_BUCKET, voice_model.audio_s3_key, downloaded_path)
+
+    # F5-TTS expects a 24kHz mono clip regardless of the 44.1kHz master stored
+    # in S3, and is zero-shot — no clipping needed, it handles any reference
+    # length itself.
     subprocess.run([
         "ffmpeg", "-y", "-v", "error",
-        "-i", TTS_REFERENCE_AUDIO,
+        "-i", downloaded_path,
         "-ar", "24000",
         "-ac", "1",
         "-c:a", "pcm_s16le",
         clip_path,
     ], check=True, capture_output=True)
 
-    print(f"Reference ready: {clip_path} "
-          f"(from {os.path.basename(TTS_REFERENCE_AUDIO)})")
-    return clip_path
+    print(f"[{voice_model_id}] Reference ready: {clip_path} "
+          f"(from {voice_model.audio_s3_key})")
+
+    result = (clip_path, voice_model.reference_text or "")
+    _voice_reference_cache[voice_model_id] = result
+    return result
 
 
 @worker_process_init.connect
 def load_model_on_startup(**kwargs):
-    global _f5tts_model, _reference_path
+    global _f5tts_model
     print("Loading F5-TTS model...")
     try:
         from f5_tts.api import F5TTS
         _f5tts_model = F5TTS(device=TTS_DEVICE)
         print(f"F5-TTS model loaded on {TTS_DEVICE}")
-        _reference_path = prepare_reference_audio()
     except Exception as e:
         print(f"Failed to initialise F5-TTS: {e}")
         raise
@@ -359,21 +400,18 @@ def run_quality_gates(audio_path: str) -> float:
 # ─── Audio generation ───────────────────────────────────────────────────────
 
 def synthesize(gen_text: str, out_path: str,
-               reference_path: str = None) -> float:
-    """Run F5-TTS against the prepared reference and gate the raw result."""
-    reference_path = reference_path or _reference_path
+               reference_path: str, ref_text: str = "") -> float:
+    """Run F5-TTS against the given reference and gate the raw result."""
     if _f5tts_model is None:
         raise RuntimeError("F5-TTS model not loaded.")
-    if reference_path is None:
-        raise RuntimeError("Reference voice not prepared.")
 
     # Buys the last word room to finish; see TTS_GEN_TEXT_TAIL above.
     spoken_text = gen_text + GEN_TEXT_TAIL
 
-    # ref_text="" tells F5-TTS to transcribe the reference itself.
+    # An empty ref_text tells F5-TTS to transcribe the reference itself.
     _f5tts_model.infer(
         ref_file=reference_path,
-        ref_text="",
+        ref_text=ref_text,
         gen_text=spoken_text,
         file_wave=out_path,
         seed=TTS_SEED,
@@ -502,30 +540,36 @@ def generate_tts(self, prompt_id: str, text: str, voice_model_id: str):
         prompt.text_processed = processed_text
         db.commit()
 
+        # ── Step 2: Resolve this voice model's own reference clip ─────────
+        print(f"[{prompt_id}] Preparing reference audio for voice {voice_model_id}...")
+        reference_path, reference_text = prepare_voice_reference(voice_model_id)
+
         with tempfile.TemporaryDirectory() as tmpdir:
             raw_path = os.path.join(tmpdir, "raw.wav")
             playback_path = os.path.join(tmpdir, "playback.wav")
 
-            # ── Step 2: Generate audio with F5-TTS ────────────────────────
+            # ── Step 3: Generate audio with F5-TTS ────────────────────────
             print(f"[{prompt_id}] Generating audio with F5-TTS...")
-            raw_duration = synthesize(processed_text, raw_path)
+            raw_duration = synthesize(
+                processed_text, raw_path, reference_path, reference_text
+            )
             print(f"[{prompt_id}] Raw audio: {raw_duration:.2f}s")
 
-            # ── Step 3: Normalise ──────────────────────────────────────────
+            # ── Step 4: Normalise ──────────────────────────────────────────
             print(f"[{prompt_id}] Normalising with FFmpeg...")
             normalize_audio(raw_path, playback_path)
 
-            # ── Step 4: Quality gates ──────────────────────────────────────
+            # ── Step 5: Quality gates ──────────────────────────────────────
             print(f"[{prompt_id}] Running quality gates...")
             duration = run_quality_gates(playback_path)
 
-            # ── Step 5: Upload to MinIO/S3 ────────────────────────────────
+            # ── Step 6: Upload to MinIO/S3 ────────────────────────────────
             print(f"[{prompt_id}] Uploading to storage...")
             timestamp = int(time.time())
             s3_key = f"voices/v1.0/{prompt_id}/{timestamp}.wav"
             audio_url = upload_to_s3(playback_path, s3_key)
 
-            # ── Step 6: Update VoicePrompt to ready ───────────────────────
+            # ── Step 7: Update VoicePrompt to ready ───────────────────────
             print(f"[{prompt_id}] Done. Duration: {duration:.2f}s")
             prompt.status = "ready"
             prompt.audio_url = audio_url

@@ -1,9 +1,11 @@
+import uuid
 from django.utils import timezone
 from rest_framework import generics, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 from .models import VoicePrompt, VoiceModelVersion
 from .serializers import (
     VoicePromptSerializer,
@@ -12,6 +14,7 @@ from .serializers import (
     VoicePromptRejectSerializer,
     VoicePromptExportSerializer,
 )
+from .storage import upload_file as upload_to_storage
 from apps.audit.models import AuditLog
 import boto3
 import subprocess
@@ -53,9 +56,146 @@ class VoiceModelVersionListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return VoiceModelVersion.objects.all().order_by(
+        return VoiceModelVersion.objects.select_related("created_by").order_by(
             "-is_active", "-created_at"
         )
+
+
+class VoiceModelVersionUploadView(APIView):
+    """
+    POST /api/voice-models/upload/
+    Uploads a new reference voice clip, converts it to 44.1kHz WAV, stores it
+    in MinIO/S3, and creates a VoiceModelVersion record for it.
+    Admin only.
+    """
+    permission_classes = [IsAdminRole]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        audio_file = request.FILES.get("audio_file")
+        display_name = (request.data.get("display_name") or "").strip()
+        language = (request.data.get("language") or "").strip()
+        reference_text = (request.data.get("reference_text") or "").strip()
+
+        errors = {}
+        if not audio_file:
+            errors["audio_file"] = ["This field is required."]
+        if not display_name:
+            errors["display_name"] = ["This field is required."]
+        valid_languages = [choice[0] for choice in VoiceModelVersion.Language.choices]
+        if not language:
+            errors["language"] = ["This field is required."]
+        elif language not in valid_languages:
+            errors["language"] = [f"Must be one of: {', '.join(valid_languages)}."]
+
+        if errors:
+            return Response(
+                {"error": "validation_error", "detail": errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        voice_id = uuid.uuid4()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            upload_path = os.path.join(tmpdir, "upload_source")
+            with open(upload_path, "wb") as dest:
+                for chunk in audio_file.chunks():
+                    dest.write(chunk)
+
+            converted_path = os.path.join(tmpdir, "reference.wav")
+            try:
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-v", "error",
+                        "-i", upload_path,
+                        "-ar", "44100",
+                        "-ac", "1",
+                        "-c:a", "pcm_s16le",
+                        converted_path,
+                    ],
+                    check=True, capture_output=True,
+                )
+            except subprocess.CalledProcessError as e:
+                detail = e.stderr.decode() if e.stderr else str(e)
+                return Response(
+                    {"error": "conversion_failed", "detail": f"FFmpeg failed: {detail}"},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY
+                )
+
+            s3_key = f"voices/reference/{voice_id}/reference.wav"
+            upload_to_storage(converted_path, s3_key, content_type="audio/wav")
+
+        voice_model = VoiceModelVersion.objects.create(
+            id=voice_id,
+            version_label="v1.0",
+            provider="f5-tts",
+            model_variant="zero-shot",
+            reference_audio=s3_key,
+            audio_s3_key=s3_key,
+            display_name=display_name,
+            language=language,
+            reference_text=reference_text or None,
+            is_active=False,
+            created_by=request.user,
+        )
+
+        serializer = VoiceModelVersionSerializer(voice_model)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class VoiceModelVersionActivateView(APIView):
+    """
+    POST /api/voice-models/{id}/activate/
+    Makes this voice the active one, deactivating every other voice.
+    Admin only.
+    """
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            voice_model = VoiceModelVersion.objects.get(pk=pk)
+        except VoiceModelVersion.DoesNotExist:
+            return Response(
+                {"error": "not_found", "detail": "No voice model found with this ID."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        VoiceModelVersion.objects.exclude(pk=pk).update(is_active=False)
+        voice_model.is_active = True
+        voice_model.save(update_fields=["is_active"])
+
+        serializer = VoiceModelVersionSerializer(voice_model)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class VoiceModelVersionDeleteView(APIView):
+    """
+    DELETE /api/voice-models/{id}/
+    Deletes a voice model. Cannot delete the currently active voice.
+    Admin only.
+    """
+    permission_classes = [IsAdminRole]
+
+    def delete(self, request, pk):
+        try:
+            voice_model = VoiceModelVersion.objects.get(pk=pk)
+        except VoiceModelVersion.DoesNotExist:
+            return Response(
+                {"error": "not_found", "detail": "No voice model found with this ID."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if voice_model.is_active:
+            return Response(
+                {
+                    "error": "invalid_transition",
+                    "detail": "Cannot delete the active voice model. Activate another voice first."
+                },
+                status=status.HTTP_409_CONFLICT
+            )
+
+        voice_model.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ─── Prompt List ───────────────────────────────────────────────────────────
@@ -76,6 +216,7 @@ class VoicePromptListView(generics.ListAPIView):
     def get_queryset(self):
         queryset = VoicePrompt.objects.select_related(
             "voice_model",
+            "voice_model__created_by",
             "created_by",
             "approved_by",
             "rejected_by",
@@ -108,6 +249,7 @@ class VoicePromptDetailView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     queryset = VoicePrompt.objects.select_related(
         "voice_model",
+        "voice_model__created_by",
         "created_by",
         "approved_by",
         "rejected_by",

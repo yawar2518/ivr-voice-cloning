@@ -16,9 +16,13 @@ class UserBriefSerializer(serializers.ModelSerializer):
 
 class VoiceModelVersionSerializer(serializers.ModelSerializer):
     """
-    Voice model version representation inside prompt responses.
+    Voice model version representation — both standalone (GET/POST
+    /api/voice-models/...) and nested inside prompt responses.
     Per contract Section 10.
     """
+    created_by = UserBriefSerializer(read_only=True)
+    audio_url = serializers.SerializerMethodField()
+
     class Meta:
         model = VoiceModelVersion
         fields = [
@@ -26,9 +30,21 @@ class VoiceModelVersionSerializer(serializers.ModelSerializer):
             "version_label",
             "provider",
             "model_variant",
+            "display_name",
+            "language",
+            "reference_text",
+            "audio_url",
             "is_active",
+            "notes",
             "created_at",
+            "created_by",
         ]
+
+    def get_audio_url(self, obj):
+        # Re-signed on every read — see VoicePromptSerializer.get_audio_url.
+        if obj.audio_s3_key:
+            return presigned_url(obj.audio_s3_key, content_type="audio/wav")
+        return None
 
 
 class VoicePromptSerializer(serializers.ModelSerializer):

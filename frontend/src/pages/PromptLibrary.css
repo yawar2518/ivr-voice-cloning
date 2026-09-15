@@ -185,7 +185,7 @@
 }
 
 .prompt-card-view-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .prompt-status-badge {
@@ -299,7 +299,7 @@
 }
 
 .prompt-card-btn:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .prompt-card-btn:disabled {
@@ -398,7 +398,7 @@
 }
 
 .prompt-library-page-btn:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 
 .prompt-library-page-btn:disabled {

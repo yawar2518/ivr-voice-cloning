@@ -6,16 +6,35 @@ import './CustomDropdown.css';
 // theme. Replaces native <select> where a richer open/close and
 // per-option entrance animation is wanted (Prompt Library status filter,
 // Audit Log action filter).
+// Menu stays mounted for MENU_CLOSE_MS after close so custom-dropdown-menu-out
+// can play instead of the menu just vanishing.
+const MENU_CLOSE_MS = 150;
+
 export default function CustomDropdown({ options, value, onChange, placeholder = 'All' }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMenuMounted, setIsMenuMounted] = useState(false);
   const rootRef = useRef(null);
+  const closeTimerRef = useRef(null);
+
+  function openMenu() {
+    clearTimeout(closeTimerRef.current);
+    setIsMenuMounted(true);
+    setIsOpen(true);
+  }
+
+  function closeMenu() {
+    setIsOpen(false);
+    closeTimerRef.current = setTimeout(() => setIsMenuMounted(false), MENU_CLOSE_MS);
+  }
+
+  useEffect(() => () => clearTimeout(closeTimerRef.current), []);
 
   useEffect(() => {
     if (!isOpen) return;
 
     function handleClickOutside(event) {
       if (rootRef.current && !rootRef.current.contains(event.target)) {
-        setIsOpen(false);
+        closeMenu();
       }
     }
 
@@ -28,7 +47,7 @@ export default function CustomDropdown({ options, value, onChange, placeholder =
 
   function handleSelect(optionValue) {
     onChange(optionValue);
-    setIsOpen(false);
+    closeMenu();
   }
 
   return (
@@ -36,7 +55,7 @@ export default function CustomDropdown({ options, value, onChange, placeholder =
       <button
         type="button"
         className="custom-dropdown-trigger"
-        onClick={() => setIsOpen((v) => !v)}
+        onClick={() => (isOpen ? closeMenu() : openMenu())}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
@@ -51,8 +70,11 @@ export default function CustomDropdown({ options, value, onChange, placeholder =
         </svg>
       </button>
 
-      {isOpen && (
-        <ul className="custom-dropdown-menu" role="listbox">
+      {isMenuMounted && (
+        <ul
+          className={isOpen ? 'custom-dropdown-menu' : 'custom-dropdown-menu custom-dropdown-menu-closing'}
+          role="listbox"
+        >
           <li
             className={value === '' ? 'custom-dropdown-option custom-dropdown-option-active' : 'custom-dropdown-option'}
             role="option"

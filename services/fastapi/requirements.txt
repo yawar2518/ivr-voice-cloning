@@ -1,0 +1,23 @@
+# ─── FastAPI Core ───────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn==0.30.1
+
+# ─── Request validation ─────────────────────────────────────────────────────
+pydantic==2.7.4
+
+# ─── Database (same PostgreSQL as Django) ───────────────────────────────────
+sqlalchemy==2.0.31
+psycopg2-binary==2.9.9
+
+# ─── Celery (submit jobs to the worker) ─────────────────────────────────────
+celery==5.4.0
+redis==5.0.6
+
+# ─── JWT verification (shared secret with Django) ───────────────────────────
+pyjwt==2.8.0
+
+# ─── Environment ────────────────────────────────────────────────────────────
+python-decouple==3.8
+
+# ─── HTTP client (internal calls to Django if needed) ───────────────────────
+httpx==0.27.0

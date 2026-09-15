@@ -79,6 +79,7 @@
 
 .shiny-cta:active {
   translate: 0 1px;
+  scale: 0.97;
 }
 
 .shiny-cta:disabled {

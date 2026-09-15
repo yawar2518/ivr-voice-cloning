@@ -256,6 +256,27 @@ export default function PromptLibrary() {
     }
   }
 
+  async function handleDelete(prompt) {
+    const confirmed = window.confirm('Delete this prompt? This cannot be undone.');
+    if (!confirmed) return;
+
+    clearActionError(prompt.id);
+    setPendingAction(`${prompt.id}:delete`);
+    try {
+      await apiClient.deletePrompt(prompt.id, role, currentUser);
+      setPrompts((prev) => prev.filter((p) => p.id !== prompt.id));
+      setCount((prev) => Math.max(0, prev - 1));
+      if (selectedPrompt?.id === prompt.id) setSelectedPrompt(null);
+      showToast('Prompt deleted.', 'success');
+    } catch (err) {
+      const detail = err?.detail ?? 'Failed to delete prompt.';
+      setActionErrors((prev) => ({ ...prev, [prompt.id]: detail }));
+      showToast(detail, 'error');
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   return (
     <div className="prompt-library-page">
       <Navbar />
@@ -309,6 +330,7 @@ export default function PromptLibrary() {
                 const isApproving = pendingAction === `${prompt.id}:approve`;
                 const isRejecting = pendingAction === `${prompt.id}:reject`;
                 const isExporting = pendingAction === `${prompt.id}:export`;
+                const isDeleting = pendingAction === `${prompt.id}:delete`;
                 const isBusy = pendingAction?.startsWith(`${prompt.id}:`);
 
                 const showApproveReject = canApproveOrReject && prompt.status === 'ready';
@@ -418,10 +440,10 @@ export default function PromptLibrary() {
                             <button
                               type="button"
                               className="prompt-card-btn prompt-card-btn-danger"
-                              disabled
-                              title="Delete is coming soon"
+                              onClick={() => handleDelete(prompt)}
+                              disabled={isBusy}
                             >
-                              Delete
+                              {isDeleting ? 'Deleting…' : 'Delete'}
                             </button>
                           )}
                         </div>

@@ -8,6 +8,9 @@ import {
   exportPrompt,
   deletePrompt,
   getVoiceModels,
+  uploadVoiceModel,
+  activateVoiceModel,
+  deleteVoiceModel,
   generateVoice,
   getGenerationStatus,
   getAuditLog
@@ -22,6 +25,9 @@ export const mockApiClient = {
   exportPrompt,
   deletePrompt,
   getVoiceModels,
+  uploadVoiceModel,
+  activateVoiceModel,
+  deleteVoiceModel,
   generateVoice,
   getGenerationStatus,
   getAuditLog

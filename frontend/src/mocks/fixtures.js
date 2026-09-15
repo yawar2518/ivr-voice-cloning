@@ -11,6 +11,50 @@ export const MOCK_VOICE_MODEL = {
   created_at: "2026-09-10T00:00:00Z"
 };
 
+// Voice Profiles sidebar — the real backend only exposes version_label/
+// provider/model_variant/is_active/created_at today (no display_name or
+// language field yet, and no upload/activate/delete routes). This mock
+// data uses the shape the sidebar is designed against so the UI is ready
+// the moment the backend contract catches up; display_name/language are
+// derived from the same underlying model here.
+export const MOCK_VOICE_MODELS = [
+  {
+    ...MOCK_VOICE_MODEL,
+    display_name: "Sara — English",
+    language: "english"
+  },
+  {
+    id: "550e8400-e29b-41d4-a716-446655440001",
+    version_label: "v1.0",
+    provider: "chatterbox",
+    model_variant: "original",
+    is_active: false,
+    created_at: "2026-09-11T00:00:00Z",
+    display_name: "Ahmed — Urdu (Roman)",
+    language: "urdu"
+  },
+  {
+    id: "550e8400-e29b-41d4-a716-446655440002",
+    version_label: "v1.0",
+    provider: "chatterbox",
+    model_variant: "original",
+    is_active: false,
+    created_at: "2026-09-12T00:00:00Z",
+    display_name: "Priya — Hindi (Roman)",
+    language: "hindi"
+  },
+  {
+    id: "550e8400-e29b-41d4-a716-446655440003",
+    version_label: "v1.0",
+    provider: "chatterbox",
+    model_variant: "original",
+    is_active: false,
+    created_at: "2026-09-13T00:00:00Z",
+    display_name: "Bilal — Bilingual",
+    language: "bilingual"
+  }
+];
+
 export const MOCK_USERS = {
   generator: { id: 2, username: "sara",  email: "sara@agiletechstudio.com",  role: "generator" },
   approver:  { id: 3, username: "john",  email: "john@agiletechstudio.com",  role: "approver"  },

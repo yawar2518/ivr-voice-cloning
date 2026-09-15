@@ -101,6 +101,44 @@ async function request(baseUrl, path, { method = 'GET', body, auth = true, _retr
   return response.json();
 }
 
+// Multipart uploads can't go through request(): that helper always sets
+// Content-Type: application/json and JSON.stringifies the body, which
+// would break a FormData payload (the browser needs to set its own
+// Content-Type with the multipart boundary).
+async function requestMultipart(baseUrl, path, formData, { _retried = false } = {}) {
+  const headers = {};
+  const accessToken = tokenStore.getAccessToken();
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const response = await fetch(`${baseUrl}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData
+  });
+
+  if (!response.ok) {
+    const apiError = await toApiError(response);
+
+    if (response.status === 401 && apiError.error === 'token_invalid' && !_retried) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return requestMultipart(baseUrl, path, formData, { _retried: true });
+      }
+      tokenStore.clearTokens();
+    }
+
+    throw apiError;
+  }
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  return response.json();
+}
+
 function toQueryString(params = {}) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -180,6 +218,30 @@ export async function getAuditLog(params = {}) {
 export async function getVoiceModels() {
   // Section 10: GET /api/voice-models/ — { count, results }.
   return request(DJANGO_BASE_URL, '/api/voice-models/');
+}
+
+// NOTE: upload/activate/delete for voice models are not live on the
+// backend yet (only GET /api/voice-models/ exists as of this writing).
+// These call the endpoint paths the Voice Profiles sidebar was designed
+// against so the frontend needs no changes once the backend adds them.
+export async function uploadVoiceModel(formData /*, role, currentUser */) {
+  // POST /api/voice-models/upload/ (multipart/form-data) — fields:
+  // audio_file, display_name, language, reference_text (optional).
+  return requestMultipart(DJANGO_BASE_URL, '/api/voice-models/upload/', formData);
+}
+
+export async function activateVoiceModel(id /*, role, currentUser */) {
+  // POST /api/voice-models/{id}/activate/
+  return request(DJANGO_BASE_URL, `/api/voice-models/${id}/activate/`, {
+    method: 'POST'
+  });
+}
+
+export async function deleteVoiceModel(id /*, role, currentUser */) {
+  // DELETE /api/voice-models/{id}/
+  return request(DJANGO_BASE_URL, `/api/voice-models/${id}/`, {
+    method: 'DELETE'
+  });
 }
 
 export async function generateVoice(text, voiceModelId) {

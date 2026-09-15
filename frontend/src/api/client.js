@@ -16,6 +16,9 @@ export const realApiClient = {
   exportPrompt: realClient.exportPrompt,
   deletePrompt: realClient.deletePrompt,
   getVoiceModels: realClient.getVoiceModels,
+  uploadVoiceModel: realClient.uploadVoiceModel,
+  activateVoiceModel: realClient.activateVoiceModel,
+  deleteVoiceModel: realClient.deleteVoiceModel,
   generateVoice: realClient.generateVoice,
   getGenerationStatus: realClient.getGenerationStatus,
   getAuditLog: realClient.getAuditLog

@@ -1,5 +1,5 @@
 // frontend/src/mocks/handlers.js
-import { MOCK_AUDIT_LOG, MOCK_PROMPTS, MOCK_USERS, MOCK_VOICE_MODEL } from './fixtures';
+import { MOCK_AUDIT_LOG, MOCK_PROMPTS, MOCK_USERS, MOCK_VOICE_MODELS } from './fixtures';
 const MOCK_DELAY_MS = 500;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -292,9 +292,88 @@ export async function getVoiceModels() {
   await delay(MOCK_DELAY_MS);
 
   return {
-    count: 1,
-    results: [MOCK_VOICE_MODEL]
+    count: MOCK_VOICE_MODELS.length,
+    results: MOCK_VOICE_MODELS
   };
+}
+
+const VOICE_MODEL_LANGUAGES = ['english', 'urdu', 'hindi', 'bilingual'];
+
+export async function uploadVoiceModel(formData, currentUserRole) {
+  await delay(MOCK_DELAY_MS);
+
+  if (currentUserRole !== 'admin') {
+    throw { error: 'permission_denied', detail: 'Only admins can upload voice models.' };
+  }
+
+  const displayName = formData.get('display_name')?.toString().trim();
+  const language = formData.get('language')?.toString();
+  const audioFile = formData.get('audio_file');
+
+  const errors = {};
+  if (!displayName) errors.display_name = ['This field is required.'];
+  if (!language || !VOICE_MODEL_LANGUAGES.includes(language)) errors.language = ['This field is required.'];
+  if (!audioFile || !(audioFile instanceof File) || audioFile.size === 0) {
+    errors.audio_file = ['This field is required.'];
+  }
+  if (Object.keys(errors).length > 0) {
+    throw { error: 'validation_error', detail: errors };
+  }
+
+  const newModel = {
+    id: `voice-model-${Date.now()}`,
+    version_label: 'v1.0',
+    provider: 'chatterbox',
+    model_variant: 'custom',
+    is_active: false,
+    created_at: new Date().toISOString(),
+    display_name: displayName,
+    language
+  };
+
+  MOCK_VOICE_MODELS.unshift(newModel);
+
+  return newModel;
+}
+
+export async function activateVoiceModel(id, currentUserRole) {
+  await delay(MOCK_DELAY_MS);
+
+  if (currentUserRole !== 'admin') {
+    throw { error: 'permission_denied', detail: 'Only admins can activate voice models.' };
+  }
+
+  const model = MOCK_VOICE_MODELS.find((m) => m.id === id);
+  if (!model) {
+    throw { error: 'not_found', detail: 'No voice model found with this ID.' };
+  }
+
+  MOCK_VOICE_MODELS.forEach((m) => {
+    m.is_active = m.id === id;
+  });
+
+  return model;
+}
+
+export async function deleteVoiceModel(id, currentUserRole) {
+  await delay(MOCK_DELAY_MS);
+
+  if (currentUserRole !== 'admin') {
+    throw { error: 'permission_denied', detail: 'Only admins can delete voice models.' };
+  }
+
+  const index = MOCK_VOICE_MODELS.findIndex((m) => m.id === id);
+  if (index === -1) {
+    throw { error: 'not_found', detail: 'No voice model found with this ID.' };
+  }
+
+  if (MOCK_VOICE_MODELS[index].is_active) {
+    throw { error: 'invalid_transition', detail: 'Cannot delete the active voice model.' };
+  }
+
+  MOCK_VOICE_MODELS.splice(index, 1);
+
+  return null;
 }
 
 export async function generateVoice(text, voiceModelId) {

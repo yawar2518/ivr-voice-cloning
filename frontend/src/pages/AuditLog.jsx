@@ -2,29 +2,31 @@
 import { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
 import Navbar from '../components/Navbar';
+import CustomDropdown from '../components/CustomDropdown';
 import '../components/ShinyButton.css';
 import './AuditLog.css';
 
 const PAGE_SIZE = 15;
 
 const ACTION_LABELS = {
-  approved: 'Approved',
-  rejected: 'Rejected',
-  exported: 'Exported'
+  approve: 'Approved',
+  reject: 'Rejected',
+  export: 'Exported'
 };
 
 const ACTION_OPTIONS = Object.keys(ACTION_LABELS);
-
-function truncate(text, maxLength = 80) {
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, maxLength).trimEnd()}…`;
-}
 
 function formatDate(isoString) {
   return new Date(isoString).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short'
   });
+}
+
+// Section 11 gives us the prompt's UUID, not its text — show a short,
+// readable reference rather than the full id.
+function shortPromptRef(promptId) {
+  return promptId ? promptId.slice(0, 8) : promptId;
 }
 
 export default function AuditLog() {
@@ -88,20 +90,12 @@ export default function AuditLog() {
         </p>
 
         <div className="audit-log-filters">
-          <div className="shiny-select-wrap">
-            <select
-              className="audit-log-action-select shiny-select"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-            >
-              <option value="">All actions</option>
-              {ACTION_OPTIONS.map((action) => (
-                <option key={action} value={action}>
-                  {ACTION_LABELS[action]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <CustomDropdown
+            options={ACTION_OPTIONS.map((action) => ({ value: action, label: ACTION_LABELS[action] }))}
+            value={actionFilter}
+            onChange={setActionFilter}
+            placeholder="All actions"
+          />
         </div>
 
         {isLoading && <div className="audit-log-status">Loading audit log…</div>}
@@ -128,12 +122,20 @@ export default function AuditLog() {
                   </span>
                   <div className="audit-log-entry-body">
                     <p className="audit-log-entry-text">
-                      <strong>{entry.actor?.username}</strong> {entry.action}{' '}
-                      <span className="audit-log-entry-prompt">"{truncate(entry.prompt_text)}"</span>
+                      <strong>{entry.performed_by?.username}</strong>{' '}
+                      {(ACTION_LABELS[entry.action] ?? entry.action).toLowerCase()}{' '}
+                      <span className="audit-log-entry-prompt">Prompt: {shortPromptRef(entry.prompt_id)}</span>
                     </p>
-                    {entry.reason && <p className="audit-log-entry-reason">Reason: {entry.reason}</p>}
+                    {(entry.before_status || entry.after_status) && (
+                      <p className="audit-log-entry-transition">
+                        {entry.before_status ?? '—'} → {entry.after_status ?? '—'}
+                      </p>
+                    )}
+                    {entry.detail?.reason && (
+                      <p className="audit-log-entry-reason">Reason: {entry.detail.reason}</p>
+                    )}
                   </div>
-                  <span className="audit-log-entry-date">{formatDate(entry.created_at)}</span>
+                  <span className="audit-log-entry-date">{formatDate(entry.timestamp)}</span>
                 </div>
               ))}
             </div>

@@ -8,15 +8,16 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // log reflects actions taken during the session, not just seed data.
 const sessionAuditLog = [];
 
-function recordAuditEntry(action, prompt, actor, reason = null) {
+function recordAuditEntry(action, prompt, beforeStatus, afterStatus, performedBy, reason = null) {
   sessionAuditLog.unshift({
     id: `audit-${prompt.id}-${action}-${Date.now()}`,
     action,
-    actor,
+    performed_by: performedBy,
     prompt_id: prompt.id,
-    prompt_text: prompt.text,
-    reason,
-    created_at: new Date().toISOString()
+    before_status: beforeStatus,
+    after_status: afterStatus,
+    detail: reason ? { reason } : {},
+    timestamp: new Date().toISOString()
   });
 }
 
@@ -131,10 +132,11 @@ export async function approvePrompt(id, currentUserRole, currentUser) {
     };
   }
 
+  const beforeStatus = prompt.status;
   prompt.status = 'approved';
   prompt.approved_by = currentUser;
   prompt.approved_at = new Date().toISOString();
-  recordAuditEntry('approved', prompt, currentUser);
+  recordAuditEntry('approve', prompt, beforeStatus, prompt.status, currentUser);
 
   return {
     id: prompt.id,
@@ -168,11 +170,12 @@ export async function rejectPrompt(id, reason, currentUserRole, currentUser) {
     };
   }
 
+  const beforeStatus = prompt.status;
   prompt.status = 'rejected';
   prompt.rejected_by = currentUser;
   prompt.rejected_at = new Date().toISOString();
   prompt.error_detail = reason;
-  recordAuditEntry('rejected', prompt, currentUser, reason);
+  recordAuditEntry('reject', prompt, beforeStatus, prompt.status, currentUser, reason);
 
   return {
     id: prompt.id,
@@ -221,10 +224,11 @@ export async function exportPrompt(id, currentUserRole, currentUser) {
     };
   }
 
+  const beforeStatus = prompt.status;
   prompt.status = 'live';
   prompt.exported_by = currentUser;
   prompt.exported_at = new Date().toISOString();
-  recordAuditEntry('exported', prompt, currentUser);
+  recordAuditEntry('export', prompt, beforeStatus, prompt.status, currentUser);
 
   return {
     id: prompt.id,

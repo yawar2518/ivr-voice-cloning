@@ -1,23 +1,31 @@
 // frontend/src/context/AuthContext.jsx
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { decodeToken, isTokenExpired } from '../utils/jwt';
+import * as tokenStore from '../api/tokenStore';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [accessToken, setAccessToken] = useState(null);
-  const [refreshToken, setRefreshToken] = useState(null);
+  const [accessToken, setAccessToken] = useState(tokenStore.getAccessToken());
+  const [refreshToken, setRefreshToken] = useState(tokenStore.getRefreshToken());
+
+  // realApiClient can refresh tokens on its own (401 → refresh → retry);
+  // this keeps AuthContext's state in sync with tokenStore either way.
+  useEffect(() => {
+    return tokenStore.subscribe((nextAccess, nextRefresh) => {
+      setAccessToken(nextAccess);
+      setRefreshToken(nextRefresh);
+    });
+  }, []);
 
   const login = useCallback(async (username, password) => {
     const { access, refresh } = await apiClient.login(username, password);
-    setAccessToken(access);
-    setRefreshToken(refresh);
+    tokenStore.setTokens(access, refresh);
   }, []);
 
   const logout = useCallback(() => {
-    setAccessToken(null);
-    setRefreshToken(null);
+    tokenStore.clearTokens();
   }, []);
 
   const payload = decodeToken(accessToken);

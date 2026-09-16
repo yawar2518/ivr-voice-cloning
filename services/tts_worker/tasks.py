@@ -88,9 +88,37 @@ DEFAULT_REF_TEXT = (
 
 # Plausible speaking rates in bytes of Latin-script text per second. Used to
 # gate generated audio for truncation/silence — unhurried IVR delivery sits
-# around 15-20.
+# around 15-20. Also reused to sanity-check a *reference* clip's transcript
+# against its own duration at upload time (see process_voice_upload) — the
+# same mismatch that breaks generated output also breaks F5-TTS's duration
+# estimate for the reference pair itself.
 SPEECH_RATE_MIN = 9.0
 SPEECH_RATE_MAX = 30.0
+
+# ─── New voice upload processing ───────────────────────────────────────────
+# A reference clip's silence is measured in short RMS windows; a run of
+# windows below SILENCE_RMS_THRESHOLD lasting at least SILENCE_GAP_MIN_SECONDS
+# counts as a "gap" — used both to trim leading/trailing dead air and, for an
+# auto-transcribed clip, to find a clean place to cut down to size instead of
+# truncating mid-word.
+SILENCE_RMS_THRESHOLD = 0.01
+SILENCE_WINDOW_SECONDS = 0.1
+SILENCE_GAP_MIN_SECONDS = 0.3
+
+# F5-TTS's own guidance (f5_tts/infer/infer_gradio.py) is to keep reference
+# clips under 12s. MIN_REFERENCE_CLIP_SECONDS rejects a clip too short (or
+# too silent) to condition on at all, rather than saving a degenerate
+# reference that reproduces the same duration-estimate bug this whole
+# pipeline exists to prevent.
+MAX_REFERENCE_CLIP_SECONDS = config("MAX_REFERENCE_CLIP_SECONDS", default=12.0, cast=float)
+MIN_REFERENCE_CLIP_SECONDS = config("MIN_REFERENCE_CLIP_SECONDS", default=1.0, cast=float)
+
+# Languages auto-transcribed via Whisper. Whisper's native output for Urdu/
+# Hindi is Arabic-script/Devanagari, not the Romanized Latin-script text this
+# app assumes everywhere else (byte-length speech-rate math, how ops staff
+# type prompts) — so those languages require a hand-typed transcript instead
+# of risking a script mismatch feeding the same duration-estimate bug.
+AUTO_TRANSCRIBE_LANGUAGES = {"english"}
 
 TTS_SEED = config("TTS_SEED", default="1234", cast=int)
 TTS_NFE_STEP = config("TTS_NFE_STEP", default="32", cast=int)
@@ -157,6 +185,11 @@ class VoiceModelVersion(Base):
     reference_audio = Column(String(500), nullable=True)
     reference_text = Column(Text, nullable=True)
     audio_s3_key = Column(String(500), nullable=True)
+    language = Column(String(20), nullable=True)
+    status = Column(String(20))
+    celery_task_id = Column(String(255), nullable=True)
+    error_detail = Column(Text, nullable=True)
+    staging_s3_key = Column(String(500), nullable=True)
 
 
 # ─── Globals populated once per worker process ─────────────────────────────
@@ -477,6 +510,101 @@ def normalize_audio(raw_path: str, out_path: str) -> None:
     ], check=True, capture_output=True)
 
 
+# ─── Reference clip trimming (voice upload processing) ────────────────────
+
+def _rms_windows(data: np.ndarray, sample_rate: int):
+    """Per-window RMS over SILENCE_WINDOW_SECONDS-sized chunks."""
+    win = max(1, int(SILENCE_WINDOW_SECONDS * sample_rate))
+    n_windows = int(np.ceil(len(data) / win)) if len(data) else 0
+    rms = np.zeros(n_windows, dtype=np.float64)
+    for i in range(n_windows):
+        chunk = data[i * win:(i + 1) * win]
+        rms[i] = np.sqrt(np.mean(chunk.astype(np.float64) ** 2)) if len(chunk) else 0.0
+    return rms, win
+
+
+def _silence_gaps(silent: np.ndarray, win_seconds: float) -> list:
+    """(start_sec, end_sec) for each run of consecutive silent windows lasting
+    at least SILENCE_GAP_MIN_SECONDS."""
+    gaps = []
+    i, n = 0, len(silent)
+    while i < n:
+        if silent[i]:
+            j = i
+            while j < n and silent[j]:
+                j += 1
+            gap_seconds = (j - i) * win_seconds
+            if gap_seconds >= SILENCE_GAP_MIN_SECONDS:
+                gaps.append((i * win_seconds, j * win_seconds))
+            i = j
+        else:
+            i += 1
+    return gaps
+
+
+def trim_reference_clip(data: np.ndarray, sample_rate: int, allow_internal_cut: bool) -> np.ndarray:
+    """Trim leading/trailing silence, then — for an auto-transcribed clip —
+    cut down to MAX_REFERENCE_CLIP_SECONDS at the nearest natural pause
+    instead of truncating mid-word. Raises ValueError if the clip is too
+    short/silent to use as a reference at all.
+
+    A manually-transcribed clip (allow_internal_cut=False) only gets its
+    edges trimmed: the admin's transcript describes the whole clip, so an
+    internal cut would silently invalidate it. If it's still too long after
+    edge-trimming, the caller should fail and ask for a shorter upload rather
+    than guess which part of their transcript to keep.
+
+    This is the same RMS-window-scan technique used by hand earlier to fix
+    "Default Voice"/"Hafiz Arslan" — every reference clip whose trailing edge
+    lands in silence makes F5-TTS continue that silence into the start of
+    every generation, and every mismatch between a clip's duration and its
+    transcript throws off F5-TTS's duration estimate for gen_text.
+    """
+    if data.ndim > 1:
+        data = data.mean(axis=1)
+
+    rms, win = _rms_windows(data, sample_rate)
+    win_seconds = win / sample_rate
+    silent = rms < SILENCE_RMS_THRESHOLD
+
+    non_silent = np.flatnonzero(~silent)
+    if len(non_silent) == 0:
+        raise ValueError(
+            "Uploaded audio appears to contain no speech (entirely below the "
+            "silence threshold)."
+        )
+
+    start_sample = int(non_silent[0] * win)
+    end_sample = min(len(data), int((non_silent[-1] + 1) * win))
+    trimmed = data[start_sample:end_sample]
+    duration = len(trimmed) / sample_rate
+
+    if duration > MAX_REFERENCE_CLIP_SECONDS:
+        if not allow_internal_cut:
+            raise ValueError(
+                f"Reference clip is {duration:.1f}s after trimming silence; "
+                f"manually-transcribed clips must be under "
+                f"{MAX_REFERENCE_CLIP_SECONDS:.0f}s. Trim the clip and re-upload."
+            )
+        rms2, win2 = _rms_windows(trimmed, sample_rate)
+        win2_seconds = win2 / sample_rate
+        gaps = _silence_gaps(rms2 < SILENCE_RMS_THRESHOLD, win2_seconds)
+        cut_at = max(
+            (gap_start for gap_start, _ in gaps if gap_start <= MAX_REFERENCE_CLIP_SECONDS),
+            default=MAX_REFERENCE_CLIP_SECONDS,
+        )
+        trimmed = trimmed[:int(cut_at * sample_rate)]
+        duration = len(trimmed) / sample_rate
+
+    if duration < MIN_REFERENCE_CLIP_SECONDS:
+        raise ValueError(
+            f"Reference clip is only {duration:.2f}s after trimming silence; "
+            f"need at least {MIN_REFERENCE_CLIP_SECONDS:.0f}s of speech."
+        )
+
+    return trimmed
+
+
 # ─── S3 / MinIO Upload ─────────────────────────────────────────────────────
 
 def upload_to_s3(local_path: str, s3_key: str) -> str:
@@ -532,9 +660,9 @@ def generate_tts(self, prompt_id: str, text: str, voice_model_id: str):
 
         if not processed_text:
             raise ValueError("Text is empty after preprocessing.")
-        if len(processed_text) > 2000:
+        if len(processed_text) > 6000:
             raise ValueError(
-                "Preprocessed text exceeds the 2000-character limit."
+                "Preprocessed text exceeds the 6000-character limit."
             )
 
         prompt = db.query(VoicePrompt).filter(
@@ -691,3 +819,148 @@ def export_prompt(self, prompt_id: str, audio_s3_key: str):
         error_msg = f"Export error: {str(e)}"
         print(f"[{prompt_id}] {error_msg}")
         set_failed(error_msg)
+
+
+# ─── Voice Model Upload Processing ──────────────────────────────────────────
+
+@app.task(name="tts_worker.tasks.process_voice_upload", bind=True, max_retries=0)
+def process_voice_upload(self, voice_model_id: str, staging_s3_key: str):
+    """
+    Converts a freshly-uploaded reference clip to the standard playback
+    format, trims it to a clean reference clip, transcribes that exact
+    trimmed clip (English only — see AUTO_TRANSCRIBE_LANGUAGES), and saves
+    the result. Runs once per voice upload, dispatched by Django's
+    VoiceModelVersionUploadView. prepare_voice_reference is what consumes
+    the finished result at generation time.
+    """
+    db = SessionLocal()
+
+    def set_failed(error_message: str):
+        try:
+            db.rollback()
+            voice_model = db.query(VoiceModelVersion).filter(
+                VoiceModelVersion.id == uuid.UUID(voice_model_id)
+            ).first()
+            if voice_model:
+                voice_model.status = "failed"
+                voice_model.error_detail = error_message
+                db.commit()
+        except Exception as e:
+            print(f"[{voice_model_id}] Failed to update status to failed: {e}")
+
+    try:
+        voice_model = db.query(VoiceModelVersion).filter(
+            VoiceModelVersion.id == uuid.UUID(voice_model_id)
+        ).first()
+        if not voice_model:
+            raise ValueError(f"VoiceModelVersion {voice_model_id} not found.")
+
+        language = voice_model.language or "english"
+        manual_reference_text = (voice_model.reference_text or "").strip()
+
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+            region_name=AWS_S3_REGION_NAME,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            raw_path = os.path.join(tmpdir, "raw_upload")
+            converted_path = os.path.join(tmpdir, "converted.wav")
+            clip_path = os.path.join(tmpdir, "reference_clip.wav")
+
+            # ── Step 1: Download the raw upload ─────────────────────────────
+            print(f"[{voice_model_id}] Downloading staged upload...")
+            s3_client.download_file(S3_BUCKET, staging_s3_key, raw_path)
+
+            # ── Step 2: Convert to the standard playback master format ──────
+            # Same conversion Django used to run synchronously before upload;
+            # ffmpeg auto-detects the input container/codec regardless of
+            # what format the admin uploaded.
+            print(f"[{voice_model_id}] Converting to 44.1kHz mono WAV...")
+            subprocess.run([
+                "ffmpeg", "-y", "-v", "error",
+                "-i", raw_path,
+                "-ar", PLAYBACK_SAMPLE_RATE,
+                "-ac", "1",
+                "-c:a", "pcm_s16le",
+                converted_path,
+            ], check=True, capture_output=True)
+
+            # ── Step 3: Trim to a clean reference clip ───────────────────────
+            print(f"[{voice_model_id}] Trimming silence...")
+            data, sample_rate = sf.read(converted_path)
+            trimmed = trim_reference_clip(
+                data, sample_rate, allow_internal_cut=not manual_reference_text
+            )
+            sf.write(clip_path, trimmed, sample_rate, subtype="PCM_16")
+            clip_duration = len(trimmed) / sample_rate
+
+            # ── Step 4: Resolve the reference text ───────────────────────────
+            if manual_reference_text:
+                final_reference_text = manual_reference_text
+            elif language in AUTO_TRANSCRIBE_LANGUAGES:
+                print(f"[{voice_model_id}] Transcribing with Whisper...")
+                from f5_tts.infer.utils_infer import transcribe
+                final_reference_text = transcribe(clip_path, language="en").strip()
+                if not final_reference_text:
+                    raise ValueError("Whisper returned an empty transcript for this clip.")
+            else:
+                raise ValueError(
+                    f"'{language}' voices need a manually-typed transcript — "
+                    f"automatic transcription is only supported for English."
+                )
+
+            # Same mismatch check that breaks generated output (see
+            # check_raw_generation) applies to the reference pair itself:
+            # F5-TTS's duration estimate divides by len(ref_text).
+            rate = len(final_reference_text.encode("utf-8")) / clip_duration
+            if not (SPEECH_RATE_MIN <= rate <= SPEECH_RATE_MAX):
+                raise ValueError(
+                    f"Reference transcript doesn't match the clip: "
+                    f"{clip_duration:.1f}s of audio implies {rate:.1f} bytes/sec "
+                    f"of text, outside the {SPEECH_RATE_MIN:.0f}-"
+                    f"{SPEECH_RATE_MAX:.0f} bytes/sec speech range."
+                )
+
+            # ── Step 5: Upload the final reference clip ──────────────────────
+            print(f"[{voice_model_id}] Uploading processed reference clip...")
+            final_key = f"voices/reference/{voice_model_id}/reference.wav"
+            upload_to_s3(clip_path, final_key)
+
+        # ── Step 6: Update the row ────────────────────────────────────────────
+        voice_model.reference_audio = final_key
+        voice_model.audio_s3_key = final_key
+        voice_model.reference_text = final_reference_text
+        voice_model.status = "ready"
+        voice_model.error_detail = None
+        db.commit()
+
+        # ── Step 7: Clean up the now-redundant staging object ─────────────────
+        try:
+            s3_client.delete_object(Bucket=S3_BUCKET, Key=staging_s3_key)
+            voice_model.staging_s3_key = None
+            db.commit()
+        except Exception as e:
+            print(f"[{voice_model_id}] Failed to delete staging object: {e}")
+
+        print(f"[{voice_model_id}] Done. reference_text={final_reference_text!r}")
+
+    except ValueError as e:
+        print(f"[{voice_model_id}] Validation failed: {e}")
+        set_failed(str(e))
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"FFmpeg failed: {e.stderr.decode() if e.stderr else str(e)}"
+        print(f"[{voice_model_id}] {error_msg}")
+        set_failed(error_msg)
+
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        print(f"[{voice_model_id}] {error_msg}")
+        set_failed(error_msg)
+
+    finally:
+        db.close()

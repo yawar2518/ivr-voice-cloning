@@ -1,13 +1,34 @@
 // frontend/src/api/tokenStore.js
-// Plain module-level store for the current JWT pair. realApiClient (a plain
-// module, not a React component) needs to read the access token on every
-// request and write new tokens back after a silent refresh — neither of
-// which it can do if the tokens only exist as AuthContext's useState.
-// AuthContext wraps this store to stay the single source of truth other
-// components read from via useAuth().
+// Module-level JWT store with localStorage persistence, so a page refresh
+// keeps the session. realClient reads/writes here directly (it is not a
+// React component); AuthContext subscribes to stay in sync.
 
-let accessToken = null;
-let refreshToken = null;
+const STORAGE_KEY = 'voiceclone.auth';
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { access: null, refresh: null };
+    const parsed = JSON.parse(raw);
+    return { access: parsed.access ?? null, refresh: parsed.refresh ?? null };
+  } catch {
+    return { access: null, refresh: null };
+  }
+}
+
+function persist(access, refresh) {
+  try {
+    if (!access && !refresh) {
+      localStorage.removeItem(STORAGE_KEY);
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ access, refresh }));
+    }
+  } catch {
+    // storage unavailable (private mode) — in-memory tokens still work
+  }
+}
+
+let { access: accessToken, refresh: refreshToken } = load();
 const listeners = new Set();
 
 export function getAccessToken() {
@@ -21,6 +42,7 @@ export function getRefreshToken() {
 export function setTokens(nextAccess, nextRefresh) {
   accessToken = nextAccess;
   refreshToken = nextRefresh;
+  persist(accessToken, refreshToken);
   listeners.forEach((listener) => listener(accessToken, refreshToken));
 }
 
@@ -28,8 +50,6 @@ export function clearTokens() {
   setTokens(null, null);
 }
 
-// Lets AuthContext re-render when realApiClient refreshes tokens out from
-// under it (e.g. after a 401 → refresh → retry cycle).
 export function subscribe(listener) {
   listeners.add(listener);
   return () => listeners.delete(listener);

@@ -1,0 +1,90 @@
+/* frontend/src/pages/Library.css */
+
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.library-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+}
+
+.library-tab {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition:
+    background var(--transition-base),
+    color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+.library-tab:hover {
+  color: var(--color-text);
+}
+
+.library-tab-active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.library-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  width: 280px;
+  max-width: 100%;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  transition: border-color var(--transition-base);
+}
+
+.library-search:focus-within {
+  border-color: var(--color-text);
+}
+
+.library-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.library-search input:focus {
+  outline: none;
+}
+
+.library-search input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.library-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.library-page-indicator {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}

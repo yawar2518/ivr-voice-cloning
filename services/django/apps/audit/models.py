@@ -5,19 +5,24 @@ from django.conf import settings
 
 class AuditLog(models.Model):
     """
-    Records every significant action in the system.
-    Used for compliance and audit trail.
-    See API_CONTRACT.md Section 7.4
+    Trail of account and generation events, visible in the Django admin
+    (Audit > Audit logs). Written by the API views via apps.audit.services.
     """
 
     class Action(models.TextChoices):
+        REGISTER = "register", "Register"
+        LOGIN = "login", "Login"
+        LOGOUT = "logout", "Logout"
         GENERATE = "generate", "Generate"
+        DELETE = "delete", "Delete"
+        VOICE_UPLOAD = "voice_upload", "Voice upload"
+        VOICE_DELETE = "voice_delete", "Voice delete"
+        PROFILE_UPDATE = "profile_update", "Profile update"
+        CREDITS_RESET = "credits_reset", "Credits reset"
+        # Legacy IVR workflow actions, kept so old rows still display.
         APPROVE = "approve", "Approve"
         REJECT = "reject", "Reject"
         EXPORT = "export", "Export"
-        DELETE = "delete", "Delete"
-        LOGIN = "login", "Login"
-        LOGOUT = "logout", "Logout"
 
     action = models.CharField(
         max_length=30,

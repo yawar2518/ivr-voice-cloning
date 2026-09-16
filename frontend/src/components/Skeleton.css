@@ -1,72 +1,49 @@
 /* frontend/src/components/Skeleton.css */
 
 .skeleton-block {
+  position: relative;
+  overflow: hidden;
   border-radius: 8px;
-  background: linear-gradient(
-    100deg,
-    rgba(23, 21, 26, 0.08) 30%,
-    rgba(23, 21, 26, 0.16) 50%,
-    rgba(23, 21, 26, 0.08) 70%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  background: linear-gradient(90deg, #f0f0f0 0%, #fafafa 40%, #f0f0f0 80%);
+  background-size: 1200px 100%;
+  animation: shimmer 1.6s linear infinite;
 }
 
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+.skeleton-square {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: var(--radius-lg);
 }
 
-.skeleton-card {
-  cursor: default;
-}
-
-.skeleton-card:hover {
-  transform: none;
-}
-
-.skeleton-badge {
-  width: 72px;
-  height: 20px;
-  border-radius: 999px;
-}
-
-.skeleton-pill {
+.skeleton-circle {
   width: 48px;
-  height: 20px;
-  border-radius: 999px;
+  height: 48px;
+  border-radius: 50%;
 }
 
 .skeleton-line {
-  width: 100%;
   height: 14px;
+  width: 90%;
 }
 
 .skeleton-line-short {
-  width: 65%;
-}
-
-.skeleton-text-sm {
-  width: 80px;
+  width: 45%;
   height: 12px;
 }
 
-.skeleton-row {
-  align-items: center;
+.skeleton-button {
+  height: 32px;
+  width: 100%;
+  margin-top: auto;
 }
 
-.skeleton-row .audit-log-entry-body {
+.voice-card-skeleton {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .skeleton-block {
-    animation: none;
-  }
+  gap: 12px;
+  min-height: 220px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }

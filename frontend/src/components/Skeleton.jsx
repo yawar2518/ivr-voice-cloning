@@ -5,32 +5,23 @@ export function SkeletonBlock({ className = '', style }) {
   return <div className={`skeleton-block ${className}`} style={style} aria-hidden="true" />;
 }
 
-export function PromptCardSkeleton() {
+export function GenerationCardSkeleton() {
   return (
-    <div className="prompt-card skeleton-card" aria-hidden="true">
-      <div className="prompt-card-header">
-        <SkeletonBlock className="skeleton-badge" />
-        <SkeletonBlock className="skeleton-pill" />
-      </div>
+    <div className="gen-card-skeleton" aria-hidden="true">
+      <SkeletonBlock className="skeleton-square" />
       <SkeletonBlock className="skeleton-line" />
       <SkeletonBlock className="skeleton-line skeleton-line-short" />
-      <div className="prompt-card-footer">
-        <SkeletonBlock className="skeleton-text-sm" />
-        <SkeletonBlock className="skeleton-text-sm" />
-      </div>
     </div>
   );
 }
 
-export function AuditRowSkeleton() {
+export function VoiceCardSkeleton() {
   return (
-    <div className="audit-log-entry skeleton-row" aria-hidden="true">
-      <SkeletonBlock className="skeleton-badge" />
-      <div className="audit-log-entry-body">
-        <SkeletonBlock className="skeleton-line" />
-        <SkeletonBlock className="skeleton-line skeleton-line-short" />
-      </div>
-      <SkeletonBlock className="skeleton-text-sm" />
+    <div className="voice-card-skeleton" aria-hidden="true">
+      <SkeletonBlock className="skeleton-circle" />
+      <SkeletonBlock className="skeleton-line" />
+      <SkeletonBlock className="skeleton-line skeleton-line-short" />
+      <SkeletonBlock className="skeleton-button" />
     </div>
   );
 }

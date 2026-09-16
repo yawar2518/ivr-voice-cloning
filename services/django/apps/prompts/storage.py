@@ -57,6 +57,65 @@ def upload_file(local_path, s3_key, content_type=None):
     )
 
 
+def upload_fileobj(file_obj, s3_key, content_type=None):
+    """Upload an in-memory/streamed file (e.g. request.FILES) to the
+    configured bucket, creating it if missing. Used for the raw voice-model
+    upload, which is staged as-is (no local conversion) for the worker to
+    process."""
+    client = _internal_client()
+    try:
+        client.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+    except Exception:
+        client.create_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+
+    extra_args = {"ContentType": content_type} if content_type else None
+    client.upload_fileobj(
+        file_obj,
+        settings.AWS_STORAGE_BUCKET_NAME,
+        s3_key,
+        ExtraArgs=extra_args,
+    )
+
+
+def download_file(s3_key, local_path):
+    """Download one object to a local path (server side, in-network)."""
+    _internal_client().download_file(settings.AWS_STORAGE_BUCKET_NAME, s3_key, local_path)
+
+
+def copy_file(source_key, dest_key, content_type=None):
+    """Server-side copy inside the bucket (used to seed default voices)."""
+    client = _internal_client()
+    extra = {}
+    if content_type:
+        extra = {"MetadataDirective": "REPLACE", "ContentType": content_type}
+    client.copy_object(
+        Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+        CopySource={"Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": source_key},
+        Key=dest_key,
+        **extra,
+    )
+
+
+def object_exists(s3_key):
+    try:
+        _internal_client().head_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=s3_key)
+        return True
+    except Exception:
+        return False
+
+
+def delete_file(s3_key):
+    """Best-effort delete of a single object. Callers should swallow
+    exceptions — a missing/already-gone object must never block a DB
+    delete."""
+    if not s3_key:
+        return
+    _internal_client().delete_object(
+        Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+        Key=s3_key,
+    )
+
+
 def presigned_url(s3_key, download_as=None, content_type=None, expires_in=None):
     """
     Build a browser-reachable pre-signed GET URL for `s3_key`.
@@ -85,13 +144,4 @@ def presigned_url(s3_key, download_as=None, content_type=None, expires_in=None):
         "get_object",
         Params=params,
         ExpiresIn=expires_in or getattr(settings, "AWS_S3_PRESIGN_EXPIRY", 3600),
-    )
-
-
-def export_download_url(prompt):
-    """Pre-signed link to a prompt's exported 8 kHz IVR WAV, or None."""
-    return presigned_url(
-        prompt.export_s3_key,
-        download_as=f"ivr_prompt_{prompt.id}_8khz.wav",
-        content_type="audio/wav",
     )

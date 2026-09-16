@@ -1,18 +1,42 @@
 [
   {
     "model": "prompts.voicemodelversion",
-    "pk": "550e8400-e29b-41d4-a716-446655440000",
+    "pk": "a11a0000-0000-4000-8000-000000000001",
     "fields": {
       "version_label": "v1.0",
-      "provider": "chatterbox",
-      "model_variant": "original",
-      "reference_audio": "voices/reference/550e8400-e29b-41d4-a716-446655440000/reference.wav",
-      "audio_s3_key": "voices/reference/550e8400-e29b-41d4-a716-446655440000/reference.wav",
-      "display_name": "Default Voice (English)",
+      "provider": "f5-tts",
+      "model_variant": "zero-shot",
+      "reference_audio": "voices/reference/a11a0000-0000-4000-8000-000000000001/reference.wav",
+      "audio_s3_key": "voices/reference/a11a0000-0000-4000-8000-000000000001/reference.wav",
+      "staging_s3_key": null,
+      "display_name": "Aria — Professional Female",
       "language": "english",
-      "reference_text": null,
+      "reference_text": "Your call is important to us. Please hold while we connect you to the next available agent. Our offices are open Monday to Friday 9 AM to 6 PM.",
+      "status": "ready",
       "is_active": true,
-      "notes": "Chatterbox Original 0.5B (MIT). Zero-shot cloning via reference audio. Running on RTX 5060 8GB (Blackwell sm_120). PyTorch 2.9.1+cu128.",
+      "is_default": true,
+      "notes": "Platform default voice (female). Zero-shot cloning via F5-TTS from a bundled reference clip.",
+      "created_at": "2026-09-10T00:00:00Z",
+      "created_by": 1
+    }
+  },
+  {
+    "model": "prompts.voicemodelversion",
+    "pk": "a11a0000-0000-4000-8000-000000000002",
+    "fields": {
+      "version_label": "v1.0",
+      "provider": "f5-tts",
+      "model_variant": "zero-shot",
+      "reference_audio": "voices/reference/a11a0000-0000-4000-8000-000000000002/reference.wav",
+      "audio_s3_key": "voices/reference/a11a0000-0000-4000-8000-000000000002/reference.wav",
+      "staging_s3_key": null,
+      "display_name": "Marcus — Professional Male",
+      "language": "english",
+      "reference_text": "Thank you for calling AgileTech Studio. Your call is important to us. Please hold while we connect you to the next available agent. Our offices are open Monday to Friday, 9 a.m. to 6 p.m.",
+      "status": "ready",
+      "is_active": false,
+      "is_default": true,
+      "notes": "Platform default voice (male). Zero-shot cloning via F5-TTS from a bundled reference clip.",
       "created_at": "2026-09-10T00:00:00Z",
       "created_by": 1
     }

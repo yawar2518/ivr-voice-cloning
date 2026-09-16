@@ -113,6 +113,20 @@ services:
       - db
     command: celery -A core beat --loglevel=info
 
+  # Runs Django-side Celery tasks (daily credit reset). Listens only on the
+  # "django" queue so GPU generation jobs never land here and vice versa.
+  django_worker:
+    build:
+      context: ./services/django
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./services/django:/app
+    depends_on:
+      - redis
+      - db
+    command: celery -A core worker -Q django --loglevel=info --concurrency=1
+
   # ─── Frontend ──────────────────────────────────────────────────────────────
 
   frontend:

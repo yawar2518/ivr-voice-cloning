@@ -5,9 +5,16 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    # Add role to the list display and filters
-    list_display = ("username", "email", "role", "is_active", "date_joined")
-    list_filter = ("role", "is_active")
+    list_display = (
+        "username",
+        "email",
+        "tier",
+        "credits_used",
+        "credits_reset_date",
+        "is_active",
+        "date_joined",
+    )
+    list_filter = ("tier", "is_active")
     fieldsets = BaseUserAdmin.fieldsets + (
-        ("Role & Permissions", {"fields": ("role",)}),
+        ("Plan and credits", {"fields": ("tier", "credits_used", "credits_reset_date")}),
     )

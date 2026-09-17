@@ -1,0 +1,112 @@
+/* frontend/src/components/PlayerModal.css */
+
+.player-modal .modal-header {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  padding: 0;
+}
+
+.player-modal .modal-header .modal-close {
+  margin: 0;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text);
+}
+
+.player-modal .modal-body {
+  padding: 0;
+}
+
+.player-modal-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  background:
+    radial-gradient(120% 90% at 18% 12%, color-mix(in srgb, var(--card-from) 55%, #fff 0%) 0%, transparent 55%),
+    radial-gradient(110% 110% at 85% 90%, color-mix(in srgb, var(--card-to) 70%, #000 10%) 0%, transparent 60%),
+    linear-gradient(150deg, color-mix(in srgb, var(--card-from) 40%, #1a1a1a) 0%, #111111 60%, color-mix(in srgb, var(--card-to) 30%, #0a0a0a) 100%);
+}
+
+.player-modal-hero .gen-card-badge {
+  left: 16px;
+  right: auto;
+  bottom: 16px;
+}
+
+.player-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px 24px 24px;
+}
+
+.player-modal-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--color-surface-2);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.player-modal-text {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--color-surface-2);
+  font-size: 14px;
+  line-height: 1.6;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.player-modal-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.player-modal-meta dt {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+
+.player-modal-meta dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.player-modal-voice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+}
+
+.player-modal-downloads {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

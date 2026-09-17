@@ -1,0 +1,61 @@
+/* frontend/src/components/Orb.css */
+
+.orb {
+  position: relative;
+  display: inline-block;
+  width: var(--orb-size, 80px);
+  height: var(--orb-size, 80px);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: orb-pulse 3s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.orb-core {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(circle at 70% 75%, var(--orb-to) 0%, transparent 60%),
+    radial-gradient(circle at 40% 40%, var(--orb-from) 0%, var(--orb-to) 100%);
+  box-shadow:
+    0 10px 30px color-mix(in srgb, var(--orb-to) 45%, transparent),
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+    0 -8px 18px rgba(0, 0, 0, 0.18) inset,
+    0 0 40px color-mix(in srgb, var(--orb-from) 35%, transparent);
+}
+
+.orb-highlight {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(255, 255, 255, 0.28) 60deg,
+    rgba(255, 255, 255, 0) 130deg,
+    rgba(255, 255, 255, 0) 250deg,
+    rgba(255, 255, 255, 0.16) 300deg,
+    rgba(255, 255, 255, 0) 360deg
+  );
+  mix-blend-mode: soft-light;
+  animation: orb-rotate 14s linear infinite;
+}
+
+.orb-ring {
+  position: absolute;
+  inset: -14%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--orb-from) 40%, transparent);
+  opacity: 0.6;
+  animation: orb-rotate 22s linear infinite reverse;
+  mask: linear-gradient(120deg, #000 20%, transparent 60%);
+  -webkit-mask: linear-gradient(120deg, #000 20%, transparent 60%);
+}
+
+.orb-paused,
+.orb-paused .orb-highlight,
+.orb-paused .orb-ring {
+  animation-play-state: paused;
+}

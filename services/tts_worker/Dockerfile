@@ -25,46 +25,43 @@ RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
 # ─── Working Directory ─────────────────────────────────────────────────────
 WORKDIR /app
 
-# ─── Step 1: Install PyTorch 2.9.1+cu128 FIRST ────────────────────────────
-# Must happen before chatterbox-tts — it pins torch==2.6.0 which has no
-# sm_120 kernels for Blackwell GPUs (RTX 5050/5060 series)
+# ─── Step 1: Install PyTorch with CUDA 12.8 ────────────────────────────────
+# F5-TTS docs recommend torch==2.8.0+cu128 but 2.9.1 also works
+# Using 2.9.1 for Blackwell GPU (RTX 5050 sm_120) support
 RUN pip install --upgrade pip && \
     pip install \
         torch==2.9.1+cu128 \
         torchaudio==2.9.1+cu128 \
         --index-url https://download.pytorch.org/whl/cu128
 
-# ─── Step 2: Install Chatterbox WITHOUT its pinned torch dependency ────────
-RUN pip install chatterbox-tts --no-deps
+# ─── Step 2: Install F5-TTS ────────────────────────────────────────────────
+# Single pip install — handles all its own dependencies cleanly
+# No --no-deps tricks needed unlike Chatterbox
+RUN pip install f5-tts
 
-# ─── Step 3: Install Chatterbox dependencies with correct pinned versions ──
-# Versions are pinned to match chatterbox-tts==0.1.7 exactly
-# to avoid runtime import errors
-RUN pip install \
-    transformers==5.2.0 \
-    diffusers==0.29.0 \
-    safetensors==0.5.3 \
-    huggingface_hub==1.3.0 \
-    conformer==0.3.2 \
-    inflect==7.3.1 \
-    s3tokenizer \
-    resemble-perth \
-    einops \
-    omegaconf \
-    librosa \
-    pykakasi==2.3.0 \
-    spacy-pkuseg
+# f5-tts pulls in torchcodec as a dependency, but the prebuilt wheel's CUDA
+# extension is ABI-incompatible with this image's torch/CUDA build (same
+# libtorchcodec issue as the torchaudio shim in tasks.py — see there for
+# details). transformers checks torchcodec's presence via package metadata,
+# not a real import, so it unconditionally imports it inside the ASR
+# pipeline's preprocess() whenever F5-TTS auto-transcribes a reference clip
+# (ref_text=""), crashing with "Could not load this library:
+# libtorchcodec_image.so". Nothing here needs torchcodec — audio loading goes
+# through the soundfile-backed shim instead — so removing it avoids the crash
+# entirely.
+RUN pip uninstall -y torchcodec
 
-# ─── Step 4: Install project requirements ──────────────────────────────────
+# ─── Step 3: Install project requirements ──────────────────────────────────
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# ─── Step 5: Copy app code ─────────────────────────────────────────────────
+# ─── Step 4: Copy app code ─────────────────────────────────────────────────
 COPY . .
 
-# ─── Step 6: Verify PyTorch version at build time ──────────────────────────
+# ─── Step 5: Verify at build time ──────────────────────────────────────────
 RUN python -c "\
 import torch; \
-print('PyTorch version:', torch.__version__); \
-print('CUDA available at build:', torch.cuda.is_available()); \
-print('Note: CUDA=False at build time is expected — GPU only available at runtime')"
+print('PyTorch:', torch.__version__); \
+print('CUDA at build (expected False):', torch.cuda.is_available()); \
+from f5_tts.api import F5TTS; \
+print('F5-TTS imported successfully')"

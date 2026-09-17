@@ -56,3 +56,8 @@ frontend/.env.*
 .DS_Store
 Thumbs.db
 EOF
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/.playwright/

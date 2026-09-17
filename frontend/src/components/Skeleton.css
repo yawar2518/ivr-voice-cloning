@@ -1,0 +1,49 @@
+/* frontend/src/components/Skeleton.css */
+
+.skeleton-block {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f0f0f0 0%, #fafafa 40%, #f0f0f0 80%);
+  background-size: 1200px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.skeleton-square {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: var(--radius-lg);
+}
+
+.skeleton-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+.skeleton-line {
+  height: 14px;
+  width: 90%;
+}
+
+.skeleton-line-short {
+  width: 45%;
+  height: 12px;
+}
+
+.skeleton-button {
+  height: 32px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.voice-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 220px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}

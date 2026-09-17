@@ -4,12 +4,12 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
 
-    # Auth endpoints — /api/auth/token/ etc.
+    # Auth: register / token / refresh / verify
     path("api/auth/", include("apps.users.urls")),
 
-    # Prompts + voice models endpoints
-    path("api/", include("apps.prompts.urls")),
+    # Account: profile + internal credit deduction
+    path("api/user/", include("apps.users.user_urls")),
 
-    # Audit endpoints — added when we build the audit app
-    # path("api/", include("apps.audit.urls")),
+    # Voice models + generations
+    path("api/", include("apps.prompts.urls")),
 ]

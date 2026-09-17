@@ -1,0 +1,147 @@
+"""
+Pre-signed URL helpers for MinIO / S3.
+
+Pre-signing is a local HMAC over the request — boto3 never contacts the server —
+so the client used here is built against AWS_S3_PUBLIC_ENDPOINT_URL (the address
+the browser can reach) rather than the in-network AWS_S3_ENDPOINT_URL. That is
+what makes the returned link usable from outside the compose network, and it
+keeps working if the deployment ever moves to SigV4, where the host is part of
+the signed payload and a post-hoc string replacement would break it.
+"""
+
+import boto3
+from botocore.client import Config
+from django.conf import settings
+
+
+def _public_client():
+    return boto3.client(
+        "s3",
+        endpoint_url=getattr(settings, "AWS_S3_PUBLIC_ENDPOINT_URL", None),
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
+        config=Config(signature_version="s3v4"),
+    )
+
+
+def _internal_client():
+    # In-network endpoint ("http://minio:9000") — used for server-side
+    # uploads, which happen inside the compose network rather than from the
+    # browser. See the module docstring for why this differs from the client
+    # used for pre-signing.
+    return boto3.client(
+        "s3",
+        endpoint_url=getattr(settings, "AWS_S3_ENDPOINT_URL", None),
+        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        region_name=getattr(settings, "AWS_S3_REGION_NAME", "us-east-1"),
+        config=Config(signature_version="s3v4"),
+    )
+
+
+def upload_file(local_path, s3_key, content_type=None):
+    """Upload a local file to the configured bucket, creating it if missing."""
+    client = _internal_client()
+    try:
+        client.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+    except Exception:
+        client.create_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+
+    extra_args = {"ContentType": content_type} if content_type else None
+    client.upload_file(
+        local_path,
+        settings.AWS_STORAGE_BUCKET_NAME,
+        s3_key,
+        ExtraArgs=extra_args,
+    )
+
+
+def upload_fileobj(file_obj, s3_key, content_type=None):
+    """Upload an in-memory/streamed file (e.g. request.FILES) to the
+    configured bucket, creating it if missing. Used for the raw voice-model
+    upload, which is staged as-is (no local conversion) for the worker to
+    process."""
+    client = _internal_client()
+    try:
+        client.head_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+    except Exception:
+        client.create_bucket(Bucket=settings.AWS_STORAGE_BUCKET_NAME)
+
+    extra_args = {"ContentType": content_type} if content_type else None
+    client.upload_fileobj(
+        file_obj,
+        settings.AWS_STORAGE_BUCKET_NAME,
+        s3_key,
+        ExtraArgs=extra_args,
+    )
+
+
+def download_file(s3_key, local_path):
+    """Download one object to a local path (server side, in-network)."""
+    _internal_client().download_file(settings.AWS_STORAGE_BUCKET_NAME, s3_key, local_path)
+
+
+def copy_file(source_key, dest_key, content_type=None):
+    """Server-side copy inside the bucket (used to seed default voices)."""
+    client = _internal_client()
+    extra = {}
+    if content_type:
+        extra = {"MetadataDirective": "REPLACE", "ContentType": content_type}
+    client.copy_object(
+        Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+        CopySource={"Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": source_key},
+        Key=dest_key,
+        **extra,
+    )
+
+
+def object_exists(s3_key):
+    try:
+        _internal_client().head_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=s3_key)
+        return True
+    except Exception:
+        return False
+
+
+def delete_file(s3_key):
+    """Best-effort delete of a single object. Callers should swallow
+    exceptions — a missing/already-gone object must never block a DB
+    delete."""
+    if not s3_key:
+        return
+    _internal_client().delete_object(
+        Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+        Key=s3_key,
+    )
+
+
+def presigned_url(s3_key, download_as=None, content_type=None, expires_in=None):
+    """
+    Build a browser-reachable pre-signed GET URL for `s3_key`.
+
+    download_as -- when given, MinIO echoes back a Content-Disposition
+                   attachment header with this filename. Needed because the
+                   frontend is served from a different origin than MinIO, and
+                   browsers ignore the <a download> attribute cross-origin; the
+                   header is what actually forces a named file download.
+    Returns None when there is no key, so callers can treat "not exported yet"
+    and "no audio" the same way.
+    """
+    if not s3_key:
+        return None
+
+    params = {
+        "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
+        "Key": s3_key,
+    }
+    if content_type:
+        params["ResponseContentType"] = content_type
+    if download_as:
+        params["ResponseContentDisposition"] = f'attachment; filename="{download_as}"'
+
+    return _public_client().generate_presigned_url(
+        "get_object",
+        Params=params,
+        ExpiresIn=expires_in or getattr(settings, "AWS_S3_PRESIGN_EXPIRY", 3600),
+    )

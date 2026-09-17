@@ -1,18 +1,13 @@
 // frontend/src/components/ProtectedRoute.jsx
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// Gates a route by auth state and, optionally, role (Section 6 permission
-// matrix — roles are exactly "generator" | "approver" | "admin").
-export default function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, role } = useAuth();
+export default function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   return children;

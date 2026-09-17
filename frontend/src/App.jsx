@@ -1,49 +1,75 @@
-import { Navigate, BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import Generate from './pages/Generate';
-import PromptLibrary from './pages/PromptLibrary';
-import AuditLog from './pages/AuditLog';
+import { ToastProvider } from './context/ToastContext';
+import { UIProvider } from './context/UIContext';
+import { VoicesProvider } from './context/VoicesContext';
+import AppLayout from './components/layout/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Home from './pages/Home';
+import Voices from './pages/Voices';
+import Library from './pages/Library';
+import Settings from './pages/Settings';
 
-function RootRedirect() {
+function PublicOnly({ children }) {
   const { isAuthenticated } = useAuth();
-  return <Navigate to={isAuthenticated ? '/generate' : '/login'} replace />;
+  const location = useLocation();
+  const from = location.state?.from;
+  const target = from && !['/login', '/signup'].includes(from) ? from : '/';
+  return isAuthenticated ? <Navigate to={target} replace /> : children;
 }
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/generate"
-            element={
-              <ProtectedRoute>
-                <Generate />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/prompts"
-            element={
-              <ProtectedRoute>
-                <PromptLibrary />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/audit-log"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AuditLog />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<RootRedirect />} />
-        </Routes>
-      </BrowserRouter>
+      <ToastProvider>
+        <UIProvider>
+          <VoicesProvider>
+            <BrowserRouter>
+              <ErrorBoundary>
+                <Routes>
+                  <Route
+                    path="/login"
+                    element={
+                      <PublicOnly>
+                        <Login />
+                      </PublicOnly>
+                    }
+                  />
+                  <Route
+                    path="/signup"
+                    element={
+                      <PublicOnly>
+                        <Signup />
+                      </PublicOnly>
+                    }
+                  />
+
+                  <Route
+                    element={
+                      <ProtectedRoute>
+                        <AppLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/" element={<Home />} />
+                    <Route path="/tts" element={<Home focusEditor />} />
+                    <Route path="/voices" element={<Voices />} />
+                    <Route path="/library" element={<Library />} />
+                    <Route path="/history" element={<Navigate to="/library" replace />} />
+                    <Route path="/prompts" element={<Navigate to="/library" replace />} />
+                    <Route path="/settings" element={<Settings />} />
+                  </Route>
+
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </ErrorBoundary>
+            </BrowserRouter>
+          </VoicesProvider>
+        </UIProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

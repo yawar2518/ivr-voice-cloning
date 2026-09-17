@@ -1,30 +1,29 @@
 // frontend/src/pages/Login.jsx
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { CircleAlert, Eye, EyeOff, Lock, Mail, Waves } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import ShinyButton from '../components/ShinyButton';
-import './Login.css';
+import Orb from '../components/Orb';
+import { GRADIENT_PRESETS } from '../utils/format';
+import './Auth.css';
 
 export default function Login() {
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
-
     try {
-      await login(username, password);
-      navigate('/generate', { state: { justLoggedIn: true } });
+      await login(identifier.trim(), password);
+      // The PublicOnly route guard redirects to the page the user came from.
     } catch (err) {
-      // Section 12: error === "authentication_failed" → detail is a string
       setError(err?.detail ?? 'Login failed. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -32,141 +31,88 @@ export default function Login() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <div className="login-brand">
-          <span className="login-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"
-                stroke="#fff"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-              <path
-                d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3"
-                stroke="#fff"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+    <div className="auth-page">
+      <div className="auth-orbs" aria-hidden="true">
+        <Orb gradient={GRADIENT_PRESETS[0]} size={160} className="auth-orb-a" />
+        <Orb gradient={GRADIENT_PRESETS[4]} size={110} className="auth-orb-b" />
+        <Orb gradient={GRADIENT_PRESETS[3]} size={70} className="auth-orb-c" />
+      </div>
+
+      <div className="auth-card">
+        <div className="auth-brand">
+          <span className="brand-mark" aria-hidden="true">
+            <Waves size={16} strokeWidth={2.2} />
           </span>
-          <span className="login-brand-name">IVR Voice Cloning</span>
+          <span className="brand-name">VoiceClone</span>
         </div>
 
-        <div className="login-header">
-          <h1 className="login-title">Welcome back</h1>
-          <p className="login-subtitle">Sign in to manage your voice prompts and campaigns.</p>
-        </div>
+        <h1 className="auth-title">Welcome back</h1>
+        <p className="auth-subtitle">Sign in to keep generating with your voices.</p>
 
-        <form className="login-form" onSubmit={handleSubmit} noValidate>
-          <div className="login-field">
-            <label htmlFor="username">Username</label>
-            <div className="login-input-wrap">
-              <svg className="login-input-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
+          <div className="field">
+            <label className="field-label" htmlFor="identifier">
+              Email
+            </label>
+            <div className="auth-input-wrap">
               <input
-                id="username"
+                id="identifier"
+                className="input"
                 type="text"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="you@example.com"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 autoComplete="username"
+                autoFocus
                 required
               />
+              <Mail className="auth-input-icon" size={16} strokeWidth={1.8} aria-hidden="true" />
             </div>
           </div>
 
-          <div className="login-field">
-            <label htmlFor="password">Password</label>
-            <div className="login-input-wrap">
-              <svg className="login-input-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.8" />
-                <path
-                  d="M8 11V8a4 4 0 0 1 8 0v3"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+          <div className="field">
+            <label className="field-label" htmlFor="password">
+              Password
+            </label>
+            <div className="auth-input-wrap">
               <input
                 id="password"
+                className="input"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
                 required
+                style={{ paddingRight: 40 }}
               />
-              <ShinyButton
-                variant="icon"
-                className="login-password-toggle-shiny"
+              <Lock className="auth-input-icon" size={16} strokeWidth={1.8} aria-hidden="true" />
+              <button
+                type="button"
+                className="btn btn-icon auth-toggle"
                 onClick={() => setShowPassword((v) => !v)}
-                ariaLabel={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? (
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.5 5.2A10.6 10.6 0 0 1 12 5c5 0 9 4 10 7a12.6 12.6 0 0 1-3.1 4.2M6.6 6.6C4.6 8 3.2 10 2 12c1 3 5 7 10 7 1.2 0 2.3-.2 3.4-.6"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"
-                      stroke="currentColor"
-                      strokeWidth="1.7"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
-                  </svg>
-                )}
-              </ShinyButton>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 
-          <div className="login-row">
-            <label className="login-remember">
-              <input type="checkbox" />
-              Remember me
-            </label>
-            <a className="login-forgot" href="#">
-              Forgot password?
-            </a>
-          </div>
-
           {error && (
-            <p className="login-error" role="alert">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M12 8v5M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
+            <p className="auth-error" role="alert">
+              <CircleAlert size={15} aria-hidden="true" />
               <span>{error}</span>
             </p>
           )}
 
-          <ShinyButton type="submit" className="login-submit-shiny" disabled={isSubmitting}>
-            {isSubmitting && <span className="login-spinner" aria-hidden="true" />}
-            {isSubmitting ? 'Logging in…' : 'Log in'}
-          </ShinyButton>
+          <button type="submit" className="btn btn-primary auth-submit" disabled={isSubmitting || !identifier || !password}>
+            {isSubmitting && <span className="spinner" aria-hidden="true" />}
+            {isSubmitting ? 'Signing in…' : 'Sign In'}
+          </button>
         </form>
 
-        <p className="login-footer">
-          Need access? <a href="#">Contact your administrator</a>
+        <p className="auth-footer">
+          Don&apos;t have an account? <Link to="/signup">Sign up</Link>
         </p>
       </div>
     </div>

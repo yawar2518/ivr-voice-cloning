@@ -9,6 +9,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost").split(",")
+# The FastAPI service reaches Django on the compose network as "web" for
+# internal credit deductions; always accept that hostname.
+for _internal_host in ("web", "127.0.0.1"):
+    if _internal_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_internal_host)
 
 # ─── Applications ──────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -119,6 +124,9 @@ REST_FRAMEWORK = {
     # Add pagination
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # The download endpoint uses ?format=mp3|wav as an ordinary query
+    # parameter; stop DRF from reading it as a renderer override.
+    "URL_FORMAT_OVERRIDE": None,
 }
 
 # ─── SimpleJWT ─────────────────────────────────────────────────────────────
@@ -137,6 +145,12 @@ AUTHENTICATION_BACKENDS = [
     "guardian.backends.ObjectPermissionBackend",
 ]
 
+# ─── Internal service-to-service auth ──────────────────────────────────────
+# Shared secret the FastAPI generation service presents (X-Internal-Token)
+# when it calls PATCH /api/user/credits/deduct/. Falls back to a value
+# derived from SECRET_KEY so a single-host dev setup needs no extra config.
+INTERNAL_API_TOKEN = config("INTERNAL_API_TOKEN", default=f"internal-{SECRET_KEY}")
+
 # ─── Celery ────────────────────────────────────────────────────────────────
 CELERY_BROKER_URL = config("REDIS_URL", default="redis://redis:6379/0")
 CELERY_RESULT_BACKEND = config("REDIS_URL", default="redis://redis:6379/0")
@@ -144,6 +158,23 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
+
+# Django-side tasks (credit resets) run on a dedicated queue consumed by the
+# `django_worker` service. The GPU tts_worker only listens on the default
+# "celery" queue, so nothing Django-specific ever lands on it.
+CELERY_TASK_ROUTES = {
+    "apps.users.tasks.*": {"queue": "django"},
+}
+
+from celery.schedules import crontab  # noqa: E402
+
+CELERY_BEAT_SCHEDULE = {
+    "reset-expired-credits-daily": {
+        "task": "apps.users.tasks.reset_expired_credits",
+        "schedule": crontab(hour=0, minute=5),
+        "options": {"queue": "django"},
+    },
+}
 
 # ─── Storage — MinIO (dev) / AWS S3 (prod) ─────────────────────────────────
 USE_S3 = config("USE_S3", default=False, cast=bool)
@@ -158,3 +189,17 @@ if USE_S3:
     AWS_S3_ENDPOINT_URL = config("AWS_S3_ENDPOINT_URL", default=None)
     AWS_DEFAULT_ACL = None
     AWS_S3_FILE_OVERWRITE = False
+
+    # Endpoint the *browser* can reach. AWS_S3_ENDPOINT_URL above is the
+    # in-network address ("http://minio:9000") — it resolves inside the compose
+    # network but not on the user's machine, so a pre-signed URL built from it
+    # is useless to the frontend. Pre-signing is an offline computation, so we
+    # sign against this public address directly rather than string-replacing the
+    # host afterwards. In production both point at the same real S3 endpoint.
+    AWS_S3_PUBLIC_ENDPOINT_URL = config(
+        "AWS_S3_PUBLIC_ENDPOINT_URL",
+        default="http://localhost:9000",
+    )
+    AWS_S3_PRESIGN_EXPIRY = config(
+        "AWS_S3_PRESIGN_EXPIRY", default=3600, cast=int
+    )

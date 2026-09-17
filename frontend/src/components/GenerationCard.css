@@ -1,0 +1,150 @@
+/* frontend/src/components/GenerationCard.css */
+
+.gen-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 1100px) {
+  .gen-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .gen-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .gen-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gen-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--radius-lg);
+  transition: transform 150ms ease;
+}
+
+.gen-card:not(:disabled):active {
+  transform: scale(0.99);
+}
+
+.gen-card-art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 18% 12%, color-mix(in srgb, var(--card-from) 55%, #fff 0%) 0%, transparent 55%),
+    radial-gradient(110% 110% at 85% 90%, color-mix(in srgb, var(--card-to) 70%, #000 10%) 0%, transparent 60%),
+    linear-gradient(150deg, color-mix(in srgb, var(--card-from) 40%, #1a1a1a) 0%, #111111 60%, color-mix(in srgb, var(--card-to) 30%, #0a0a0a) 100%);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.gen-card:hover .gen-card-art {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: var(--shadow-lg);
+}
+
+.gen-card-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 60% at 50% 55%, color-mix(in srgb, var(--card-from) 28%, transparent) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(0, 0, 0, 0.18) 100%);
+  pointer-events: none;
+}
+
+.gen-card-badge {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: var(--shadow-sm);
+}
+
+.gen-card-state {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.gen-card-state-processing {
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.gen-card-state-failed {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.gen-card-spin {
+  animation: spin 1s linear infinite;
+}
+
+.gen-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.gen-card-text {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.gen-card-time {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* Skeleton variant */
+
+.gen-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gen-card-skeleton .skeleton-block {
+  border-radius: var(--radius-lg);
+}

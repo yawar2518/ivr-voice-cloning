@@ -290,12 +290,33 @@ DAY_ABBREVIATIONS = {
 }
 
 
+# Inline "emotion tags" in the ElevenLabs style ([laughs], [whispers], ...).
+# F5-TTS is a zero-shot cloning model with no notion of such directives: left
+# in, the tag is read aloud as a word. Pause-like tags become a real pause;
+# every other tag is dropped. Keep in sync with strip_emotion_tags() in
+# services/fastapi/main.py, which uses the same rule to bill only spoken text.
+EMOTION_TAG_RE = re.compile(r"\[[^\[\]\n]{1,40}\]")
+PAUSE_TAGS = {"pause", "break", "silence", "beat", "long pause", "short pause"}
+
+
+def strip_emotion_tags(text: str) -> str:
+    def replace(match):
+        inner = match.group(0)[1:-1].strip().lower()
+        return ", " if inner in PAUSE_TAGS else " "
+    return EMOTION_TAG_RE.sub(replace, text)
+
+
 def preprocess_text(text: str) -> str:
     import inflect
     p = inflect.engine()
 
+    text = strip_emotion_tags(text)
     text = re.sub(r"<[^>]+>", "", text)
     text = text.replace("...", ", ")
+    # Collapse doubled punctuation a stripped tag may leave behind (", ,").
+    text = re.sub(r"(\s*,\s*){2,}", ", ", text)
+    text = re.sub(r"\s+([,.!?;:])", r"\1", text)
+    text = re.sub(r"([.!?])\s*,\s*", r"\1 ", text)
 
     def expand_currency(match):
         amount = match.group(1).replace(",", "")

@@ -38,6 +38,16 @@ DJANGO_INTERNAL_URL = config("DJANGO_INTERNAL_URL", default="http://web:8000").r
 INTERNAL_API_TOKEN = config("INTERNAL_API_TOKEN", default=f"internal-{SECRET_KEY}")
 MAX_TEXT_LENGTH = config("MAX_GENERATION_CHARS", default=5000, cast=int)
 
+# Mirrors tts_worker.tasks.strip_emotion_tags: bracketed tags are never spoken
+# by the current model, so they are not billed either.
+import re  # noqa: E402
+
+EMOTION_TAG_RE = re.compile(r"\[[^\[\]\n]{1,40}\]")
+
+
+def billable_length(text: str) -> int:
+    return len(EMOTION_TAG_RE.sub(" ", text).strip())
+
 # Mirrors apps.users.models.TIER_CREDIT_LIMITS — used only for the cheap
 # pre-check; Django's deduct endpoint is the authority and re-validates.
 TIER_CREDIT_LIMITS = {"free": 5000, "pro": 100000, "scale": 500000}
@@ -222,7 +232,12 @@ def generate_voice(
     5. Queue the TTS job and return the job id for polling.
     """
     user_id = int(payload["user_id"])
-    needed = len(request.text)
+    needed = billable_length(request.text)
+    if needed == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"error": "validation_error", "detail": "Add some text to speak, not only tags."},
+        )
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:

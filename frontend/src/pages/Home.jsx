@@ -16,6 +16,7 @@ import { formatNumber, gradientFor, initials, languageLabel } from '../utils/for
 import './Home.css';
 
 const MAX_TEXT_LENGTH = 5000;
+const EMOTION_TAG_RE = /\[[^[\]\n]{1,40}\]/g;
 const RECENTS_LIMIT = 8;
 const BANNER_KEY = 'voiceclone.banner.dismissed';
 
@@ -37,11 +38,11 @@ const CHIPS = [
   },
   {
     label: 'Laugh uncontrollably',
-    text: "[laughs] Okay, okay, wait — you have to hear this one. [laughs] I can't even get through it without cracking up. [laughs] Alright, alright, I'm done."
+    text: "Okay, okay, wait, you have to hear this one. Ha ha ha! I can't even get through it without cracking up. Alright, alright, I'm done. Ha!"
   },
   {
     label: 'Whisper a secret',
-    text: "[whispers] Come closer. I shouldn't be telling you this, but the launch is happening tomorrow at noon. Don't tell anyone I said so."
+    text: "Come closer. I shouldn't be telling you this, but... the launch is happening tomorrow, at noon. Don't tell anyone I said so."
   },
   {
     label: 'Tell a dramatic monologue',
@@ -234,6 +235,8 @@ export default function Home({ focusEditor = false }) {
 
   const remaining = user?.credits_remaining ?? 0;
   const trimmedLength = text.length;
+  const hasEmotionTags = EMOTION_TAG_RE.test(text);
+  EMOTION_TAG_RE.lastIndex = 0;
   const overLimit = trimmedLength > MAX_TEXT_LENGTH;
   const overBudget = trimmedLength > remaining;
   const isGenerating = isSubmitting || jobStatus === 'processing';
@@ -355,7 +358,7 @@ export default function Home({ focusEditor = false }) {
             <textarea
               ref={textareaRef}
               className="gen-textarea"
-              placeholder="Type your text and add emotion tags like [whispers] or [laughs] ..."
+              placeholder="Type or paste your script. Use punctuation, commas and ellipses to shape the delivery..."
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={onKeyDown}
@@ -405,6 +408,13 @@ export default function Home({ focusEditor = false }) {
               {isSubmitting ? 'Sending…' : jobStatus === 'processing' ? 'Generating…' : 'Generate'}
             </button>
           </div>
+
+          {hasEmotionTags && (
+            <p className="gen-notice" role="status" data-testid="tag-notice">
+              Emotion tags like [laughs] or [whispers] are not supported by VoiceClone v1 yet. They are skipped before
+              synthesis and not billed.
+            </p>
+          )}
 
           {(submitError || overBudget) && (
             <p className="gen-error" role="alert" data-testid="generate-error">

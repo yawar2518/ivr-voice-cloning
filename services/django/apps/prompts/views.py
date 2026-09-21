@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from apps.audit.models import AuditLog
 from apps.audit.services import record as audit
 from core import celery_app
+from .audio_validation import MIN_AUDIO_BYTES, looks_like_audio
 from .models import VoiceModelVersion, VoicePrompt
 from .serializers import GenerationSerializer, VoiceModelVersionSerializer
 from .storage import (
@@ -112,6 +113,14 @@ class VoiceModelVersionUploadView(APIView):
         errors = {}
         if not audio_file:
             errors["audio_file"] = ["This field is required."]
+        elif audio_file.size < MIN_AUDIO_BYTES or not looks_like_audio(audio_file):
+            errors["audio_file"] = [
+                "This doesn't look like a valid MP3/WAV file — it may have been "
+                "corrupted in transit. Binary files must be sent as raw "
+                "multipart form-data, not passed through a text/string "
+                "encoding step (a common mistake in hand-built PowerShell "
+                "requests)."
+            ]
         if not display_name:
             errors["display_name"] = ["This field is required."]
         valid_languages = [choice[0] for choice in VoiceModelVersion.Language.choices]

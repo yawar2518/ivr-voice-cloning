@@ -195,6 +195,15 @@
   flex-shrink: 0;
 }
 
+.gen-notice {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-accent-soft);
+  color: #9a3412;
+  font-size: 13px;
+}
+
 .gen-error {
   margin: 12px 0 0;
   padding: 10px 12px;
